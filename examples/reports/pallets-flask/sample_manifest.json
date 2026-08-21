@@ -1,0 +1,81 @@
+{
+  "budget": 40000,
+  "total_token_estimate": 37934,
+  "files": [
+    {
+      "path": "pyproject.toml",
+      "size_bytes": 6555,
+      "reason": "entrypoint: cli (0.95)",
+      "token_estimate": 1638
+    },
+    {
+      "path": "src/flask/__main__.py",
+      "size_bytes": 30,
+      "reason": "entrypoint: library_entry (0.75)",
+      "token_estimate": 7
+    },
+    {
+      "path": "tests/test_apps/helloworld/wsgi.py",
+      "size_bytes": 36,
+      "reason": "entrypoint: http_server (0.65)",
+      "token_estimate": 9
+    },
+    {
+      "path": "tests/test_apps/cliapp/app.py",
+      "size_bytes": 52,
+      "reason": "entrypoint: http_server (0.50)",
+      "token_estimate": 13
+    },
+    {
+      "path": "src/flask/app.py",
+      "size_bytes": 65472,
+      "reason": "entrypoint: http_server (0.50)",
+      "token_estimate": 16368
+    },
+    {
+      "path": "src/flask/sansio/app.py",
+      "size_bytes": 39495,
+      "reason": "entrypoint: http_server (0.50)",
+      "token_estimate": 9873
+    },
+    {
+      "path": "examples/celery/pyproject.toml",
+      "size_bytes": 485,
+      "reason": "manifest: pyproject",
+      "token_estimate": 121
+    },
+    {
+      "path": "examples/celery/requirements.txt",
+      "size_bytes": 1073,
+      "reason": "manifest: pip",
+      "token_estimate": 268
+    },
+    {
+      "path": "examples/javascript/pyproject.toml",
+      "size_bytes": 842,
+      "reason": "manifest: pyproject",
+      "token_estimate": 210
+    },
+    {
+      "path": "examples/tutorial/pyproject.toml",
+      "size_bytes": 873,
+      "reason": "manifest: pyproject",
+      "token_estimate": 218
+    },
+    {
+      "path": "src/flask/cli.py",
+      "size_bytes": 36836,
+      "reason": "largest file (36836 bytes)",
+      "token_estimate": 9209
+    }
+  ],
+  "skipped": [
+    "CHANGES.rst - estimated 18411 tokens exceeds 10000 single-file cap",
+    "src/flask/sansio/scaffold.py - budget exhausted (7658 > 2066 remaining)",
+    "docs/quickstart.rst - budget exhausted (7513 > 2066 remaining)",
+    "docs/config.rst - budget exhausted (7248 > 2066 remaining)",
+    "src/flask/sansio/blueprints.py - budget exhausted (6754 > 2066 remaining)",
+    "src/flask/helpers.py - budget exhausted (6157 > 2066 remaining)",
+    "docs/api.rst - budget exhausted (5303 > 2066 remaining)"
+  ]
+}

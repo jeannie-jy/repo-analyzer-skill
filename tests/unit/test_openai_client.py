@@ -104,6 +104,50 @@ def test_complete_sends_correct_wire_format(server) -> None:
     }
 
 
+def test_reasoning_tuning_reaches_the_wire(server) -> None:
+    _Handler.routes = {"/v1/chat/completions": _reply("ok")}
+    settings = Settings(
+        llm_base_url=f"{server}/v1",
+        llm_api_key="sk-test",
+        llm_model="deepseek-v4-flash",
+        llm_max_output_tokens=16384,
+        llm_reasoning_effort="low",
+    )
+    client = OpenAICompatClient(settings)
+    client.complete([{"role": "user", "content": "x"}])
+    body = json.loads(_Handler.received_bodies[-1])
+    assert body["max_tokens"] == 16384
+    assert body["reasoning_effort"] == "low"
+
+
+def test_settings_max_tokens_is_default_when_not_overridden(server) -> None:
+    _Handler.routes = {"/v1/chat/completions": _reply("ok")}
+    settings = Settings(llm_base_url=f"{server}/v1", llm_api_key="k", llm_model="m")
+    OpenAICompatClient(settings).complete([{"role": "user", "content": "x"}])
+    body = json.loads(_Handler.received_bodies[-1])
+    assert body["max_tokens"] == 4096
+    assert "reasoning_effort" not in body
+
+
+def test_empty_content_from_reasoning_model_is_diagnosed(server) -> None:
+    body = json.dumps(
+        {
+            "choices": [
+                {
+                    "message": {"content": ""},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"completion_tokens": 4096,
+                      "completion_tokens_details": {"reasoning_tokens": 4096}},
+        }
+    ).encode()
+    _Handler.routes = {"/v1/chat/completions": (200, {"Content-Type": "application/json"}, body)}
+    client = _client(server)
+    with pytest.raises(LLMError, match="LLM_MAX_OUTPUT_TOKENS"):
+        client.complete([{"role": "user", "content": "x"}])
+
+
 def test_429_retries_then_succeeds(server) -> None:
     _Handler.routes = {
         "/v1/chat/completions": [

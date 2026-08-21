@@ -23,7 +23,7 @@ from typing import Any
 from ..config import Settings
 from ..errors import LLMError
 from ..github_client import _backoff_seconds
-from .base import DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_TEMPERATURE, LLMMessage
+from .base import DEFAULT_TEMPERATURE, LLMMessage
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MAX_RETRIES = 3
@@ -44,22 +44,29 @@ class OpenAICompatClient:
         messages: list[LLMMessage],
         *,
         temperature: float = DEFAULT_TEMPERATURE,
-        max_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+        max_tokens: int | None = None,
     ) -> str:
         """Complete a chat conversation and return the reply text.
+
+        ``max_tokens`` defaults to ``settings.llm_max_output_tokens``
+        (raise it for reasoning models whose chain of thought shares the
+        output budget). When ``settings.llm_reasoning_effort`` is set it
+        is sent as ``reasoning_effort``; plain chat providers simply
+        ignore it.
 
         Raises :class:`LLMError` for auth/forbidden (no retry), malformed
         responses, or transient failures that exhausted the retries.
         """
         url = f"{self.settings.llm_base_url.rstrip('/')}/chat/completions"
-        body = json.dumps(
-            {
-                "model": self.settings.llm_model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
-        ).encode("utf-8")
+        payload: dict[str, Any] = {
+            "model": self.settings.llm_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens or self.settings.llm_max_output_tokens,
+        }
+        if self.settings.llm_reasoning_effort:
+            payload["reasoning_effort"] = self.settings.llm_reasoning_effort
+        body = json.dumps(payload).encode("utf-8")
 
         attempt = 0
         while True:
@@ -104,16 +111,44 @@ class OpenAICompatClient:
 
 
 def _extract_text(data: Mapping[str, Any]) -> str:
-    """Pull ``choices[0].message.content`` out of a chat response."""
+    """Pull ``choices[0].message.content`` out of a chat response.
+
+    An empty content string from a reasoning model (finish_reason
+    "length", reasoning_tokens reported) is the classic symptom of the
+    chain of thought consuming the whole output budget — diagnose it
+    with the numbers instead of returning a confusing empty prompt.
+    """
     try:
         choices = data["choices"]
-        text = choices[0]["message"]["content"]
+        choice = choices[0]
+        text = choice["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise LLMError(
             "LLM provider response is missing choices[0].message.content."
         ) from exc
     if not isinstance(text, str):
         raise LLMError("LLM provider returned a non-string message content.")
+    if text == "":
+        finish = choice.get("finish_reason")
+        usage = data.get("usage")
+        reasoning_tokens = 0
+        if isinstance(usage, dict):
+            details = usage.get("completion_tokens_details")
+            if isinstance(details, dict):
+                reasoning_tokens = details.get("reasoning_tokens") or 0
+        raise LLMError(
+            "LLM provider returned empty content"
+            + (f" (finish_reason={finish!r}" if finish else "")
+            + (
+                f", {reasoning_tokens} of {usage.get('completion_tokens', '?')} "
+                "output tokens spent on reasoning"
+                if reasoning_tokens
+                else ""
+            )
+            + "). Reasoning models can spend the whole max_tokens budget on "
+            "chain of thought: raise LLM_MAX_OUTPUT_TOKENS or set "
+            "LLM_REASONING_EFFORT=low."
+        )
     return text
 
 

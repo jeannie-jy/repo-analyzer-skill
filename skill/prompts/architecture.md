@@ -23,6 +23,13 @@ Reason about the repository's purpose and architecture:
 4. **architecture** — the design as you can see it in the sampled code:
    layers (if any), how data flows between components (from → to → mechanism),
    and design patterns with code evidence.
+5. **core_modules** — the 3-8 modules that carry the architecture (always
+   include this key; do not rename it or fold it into key_files). Each
+   module: its `name`, the `path` of its main file, one-sentence
+   `responsibility`, the `key_symbols` (classes/functions) that define it
+   with their `location`, and its `relationships` — each an object with
+   `with` (the other module), `mechanism` (how they interact), and
+   `evidence` — NOT a plain string.
 
 ## Evidence rules (apply to every claim you make)
 
@@ -50,6 +57,11 @@ for the full shape):
   "architecture": { "summary": "...", "layers": ["..."],
                     "data_flow": [ { "from": "...", "to": "...",
                                      "mechanism": "...", "evidence": ["path"] } ],
-                    "patterns": ["..."] }
+                    "patterns": ["..."] },
+  "core_modules": [ { "name": "...", "path": "...", "responsibility": "...",
+                      "key_symbols": [ { "symbol": "...", "location": "..." } ],
+                      "relationships": [ { "with": "...", "mechanism": "...",
+                                           "evidence": ["path"] } ],
+                      "evidence": ["path"] } ]
 }
 ```

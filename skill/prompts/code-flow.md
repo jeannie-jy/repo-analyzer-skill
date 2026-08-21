@@ -24,7 +24,9 @@
    touched in order).
 3. **key_files** — the 5-10 files a newcomer must read first, and why.
 4. **reading_order** — an ordered study path: step → target file →
-   why this order helps.
+   why this order helps. `step` is a short imperative string describing
+   what to read or do ("Read the README, then the main entry"), NOT a
+   number — the schema rejects numeric steps.
 
 ## Evidence rules (apply to every claim you make)
 

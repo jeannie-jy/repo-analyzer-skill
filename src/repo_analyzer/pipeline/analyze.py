@@ -23,7 +23,7 @@ from pathlib import Path
 from ..context.code_sampler import sample_code
 from ..errors import LLMError
 from ..github_client import GitHubClient
-from ..llm.base import LLMClient
+from ..llm.base import LLMClient, LLMMessage
 from ..llm.prompts import build_analysis_messages
 from ..models import (
     ANALYSIS_FILENAME,
@@ -35,9 +35,14 @@ from ..models import (
     RepoRef,
 )
 from ..report.render import render_markdown
-from ..report.schema import REPORT_SCHEMA_VERSION, assert_valid
+from ..report.schema import REPORT_SCHEMA_VERSION, assert_valid, validate_analysis
 from .evidence import verify_evidence
 from .facts import extract_facts
+
+# How many times we let the LLM repair its own contract violations before
+# failing. One repair is cheap and fixes most drift (missing fields,
+# wrong types); two keeps worst-case latency and cost bounded.
+MAX_REPAIR_ATTEMPTS = 1
 
 
 @dataclass(frozen=True)
@@ -67,11 +72,14 @@ def analyze(
     fetch_raw_fn: Callable[[RepoRef, str, str], str] | None = None,
     prompt_dir: str | Path | None = None,
 ) -> AnalysisOutput:
-    """Run extract -> sample -> LLM reasoning -> validate -> report.
+    """Run extract -> sample -> LLM reasoning -> validate -> repair -> report.
 
-    The LLM output is gated by the report schema: a contract violation
-    raises ``ReportValidationError`` (with every violation listed)
-    instead of producing a report that cannot be trusted.
+    The LLM output is gated by the report schema. A contract violation
+    starts a repair round: the violations are sent back to the LLM (its
+    own output included as the assistant turn) and it must return the
+    complete corrected JSON. Only when the repair still fails does the
+    pipeline raise ``ReportValidationError`` instead of producing a
+    report that cannot be trusted.
     """
     facts = extract_facts(client, ref, output_dir=output_dir, fetch_raw_fn=fetch_raw_fn)
     branch = facts.repo.get("branch") or "main"
@@ -80,7 +88,15 @@ def analyze(
     messages = build_analysis_messages(facts, sample, prompt_dir=prompt_dir)
     response = llm.complete(messages)
     parsed = _parse_json_response(response)
-    assert_valid(parsed)  # ReportValidationError on contract violations
+
+    for _ in range(MAX_REPAIR_ATTEMPTS):
+        result = validate_analysis(parsed)
+        if result.valid:
+            break
+        repair = _repair_messages(messages, response, result.errors)
+        response = llm.complete(repair)
+        parsed = _parse_json_response(response)
+    assert_valid(parsed)  # ReportValidationError if repair also failed
 
     evidence = verify_evidence(parsed, facts.tree)
     report = {
@@ -119,6 +135,33 @@ def analyze(
     )
     (workdir / REPORT_MD_FILENAME).write_text(report_md, encoding="utf-8")
     return output
+
+
+def _repair_messages(
+    original: list[LLMMessage], bad_response: str, violations: list[str]
+) -> list[LLMMessage]:
+    """Build the repair turn: original context, the bad output as the
+    assistant turn, then the violations as a corrective instruction.
+
+    The facts digest and code sample are NOT repeated — the LLM already
+    saw them in this conversation; only the correction is new, which
+    keeps the repair cheap and provider-cache friendly.
+    """
+    return [
+        *original,
+        {"role": "assistant", "content": bad_response},
+        {
+            "role": "user",
+            "content": (
+                "Your previous response failed schema validation with these "
+                "errors:\n"
+                + "\n".join(f"- {v}" for v in violations)
+                + "\n\nFix every error and reply with the COMPLETE corrected "
+                "JSON object - all 13 top-level keys, correct types, nothing "
+                "missing, no commentary, no markdown fences."
+            ),
+        },
+    ]
 
 
 def _parse_json_response(response: str) -> dict:

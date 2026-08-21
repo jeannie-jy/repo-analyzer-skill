@@ -24,6 +24,7 @@ DOTENV_FILENAME = ".env"
 DEFAULT_GITHUB_API_URL = "https://api.github.com"
 DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_LLM_MODEL = "gpt-4o-mini"
+DEFAULT_MAX_OUTPUT_TOKENS = 4096
 DEFAULT_OUTPUT_DIR = "output"
 DEFAULT_TOKEN_BUDGET = 40_000
 DEFAULT_LOG_LEVEL = "INFO"
@@ -44,6 +45,12 @@ class Settings:
     llm_base_url: str = DEFAULT_LLM_BASE_URL
     llm_api_key: str | None = None
     llm_model: str = DEFAULT_LLM_MODEL
+    # Reasoning models (e.g. DeepSeek V4) consume max_tokens on chain of
+    # thought before producing any content; raise this for them. None
+    # sends no reasoning_effort field at all (plain chat models ignore it
+    # and some providers reject unknown fields).
+    llm_max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS
+    llm_reasoning_effort: str | None = None
 
     report_language: str = DEFAULT_REPORT_LANGUAGE
     output_dir: str = DEFAULT_OUTPUT_DIR
@@ -70,14 +77,14 @@ class Settings:
                     return value.strip()
             return None
 
-        token_budget = DEFAULT_TOKEN_BUDGET
-        if (raw := get("TOKEN_BUDGET")) is not None:
+        def get_int(name: str, default: int) -> int:
+            raw = get(name)
+            if raw is None:
+                return default
             try:
-                token_budget = int(raw)
+                return int(raw)
             except ValueError as exc:
-                raise ConfigError(
-                    f"TOKEN_BUDGET must be an integer, got {raw!r}"
-                ) from exc
+                raise ConfigError(f"{name} must be an integer, got {raw!r}") from exc
 
         return cls(
             github_token=get("GITHUB_TOKEN"),
@@ -85,9 +92,11 @@ class Settings:
             llm_base_url=get("LLM_BASE_URL", "OPENAI_BASE_URL") or DEFAULT_LLM_BASE_URL,
             llm_api_key=get("LLM_API_KEY", "OPENAI_API_KEY"),
             llm_model=get("LLM_MODEL") or DEFAULT_LLM_MODEL,
+            llm_max_output_tokens=get_int("LLM_MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS),
+            llm_reasoning_effort=get("LLM_REASONING_EFFORT"),
             report_language=(get("REPORT_LANGUAGE") or DEFAULT_REPORT_LANGUAGE).lower(),
             output_dir=get("OUTPUT_DIR") or DEFAULT_OUTPUT_DIR,
-            token_budget=token_budget,
+            token_budget=get_int("TOKEN_BUDGET", DEFAULT_TOKEN_BUDGET),
             log_level=(get("LOG_LEVEL") or DEFAULT_LOG_LEVEL).upper(),
         )
 

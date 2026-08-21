@@ -37,6 +37,10 @@ You are analyzing a GitHub repository for a newcomer. You receive:
 2. a CODE SAMPLE — actual file contents, referenced by exact path.
 
 IRON RULES:
+- The response MUST contain ALL of these top-level keys, never fewer,
+  never renamed: overview, tech_stack, structure, architecture,
+  core_modules, entry_points, execution_flow, key_files, dependencies,
+  risks, reading_order, contribution_opportunities, unknowns.
 - Every claim carries an "evidence" array of file paths that exist in the
   facts or the sample. Quote paths exactly as written in the digest.
 - Never invent facts, numbers, or files. Anything unanswerable from the

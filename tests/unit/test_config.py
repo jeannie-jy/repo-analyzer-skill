@@ -40,7 +40,17 @@ def test_from_env_defaults() -> None:
     assert settings.github_api_url == "https://api.github.com"
     assert settings.llm_base_url == "https://api.openai.com/v1"
     assert settings.llm_model == "gpt-4o-mini"
+    assert settings.llm_max_output_tokens == 4096
+    assert settings.llm_reasoning_effort is None
     assert settings.token_budget == 40_000
+
+
+def test_reasoning_model_tuning_keys() -> None:
+    settings = Settings.from_env(
+        {"LLM_MAX_OUTPUT_TOKENS": "16384", "LLM_REASONING_EFFORT": "low"}
+    )
+    assert settings.llm_max_output_tokens == 16384
+    assert settings.llm_reasoning_effort == "low"
 
 
 def test_openai_api_key_alias_is_accepted() -> None:

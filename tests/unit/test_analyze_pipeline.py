@@ -96,6 +96,19 @@ def _run_analyze(tmp_path, response: str | Exception):
     return result, llm
 
 
+def _run_analyze_repair(tmp_path, responses: list[str | Exception]):
+    llm = FakeLLM(responses)
+    result = analyze(
+        _client_with_app(),
+        llm,
+        REF,
+        output_dir=tmp_path,
+        budget=40_000,
+        fetch_raw_fn=_noop_raw,
+    )
+    return result, llm
+
+
 def test_analyze_writes_artifacts(tmp_path) -> None:
     result, llm = _run_analyze(tmp_path, json.dumps(VALID_ANALYSIS))
 
@@ -149,11 +162,26 @@ def test_analyze_rejects_non_json(tmp_path) -> None:
         _run_analyze(tmp_path, "I cannot analyze this repository.")
 
 
-def test_analyze_gates_schema_violations(tmp_path) -> None:
-    # contract-complete but missing a required section -> report is refused
+def test_analyze_repairs_schema_violations(tmp_path) -> None:
+    broken = {k: v for k, v in VALID_ANALYSIS.items() if k != "risks"}
+    result, llm = _run_analyze_repair(tmp_path, [json.dumps(broken), json.dumps(VALID_ANALYSIS)])
+
+    assert result.analysis == VALID_ANALYSIS  # repair round fixed it
+    assert len(llm.calls) == 2
+    repair_turn = llm.calls[1]
+    # context preserved, bad output echoed as assistant turn, then fix request
+    roles = [m["role"] for m in repair_turn]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert repair_turn[2]["content"] == json.dumps(broken)
+    assert "missing required field" in repair_turn[3]["content"]
+
+
+def test_analyze_gates_schema_violations_when_repair_fails(tmp_path) -> None:
+    # contract-complete but missing a required section -> repair round
+    # gets the same prompt, still fails -> report is refused
     broken = {k: v for k, v in VALID_ANALYSIS.items() if k != "risks"}
     with pytest.raises(ReportValidationError, match="risks"):
-        _run_analyze(tmp_path, json.dumps(broken))
+        _run_analyze_repair(tmp_path, [json.dumps(broken), json.dumps(broken)])
 
 
 def test_analyze_rejects_non_object_json(tmp_path) -> None:
