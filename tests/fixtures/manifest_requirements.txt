@@ -1,0 +1,6 @@
+Werkzeug>=3.1
+Jinja2==3.1.4
+# a comment
+-r other.txt
+-e .
+click

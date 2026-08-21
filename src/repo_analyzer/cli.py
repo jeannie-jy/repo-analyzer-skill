@@ -21,7 +21,10 @@ from typing import Any
 
 from . import __version__
 from .config import Settings
-from .errors import ConfigError, InputError, RepoAnalyzerError
+from .errors import ConfigError, ExtractionError, InputError, RepoAnalyzerError
+from .github_client import GitHubClient
+from .models import FACTS_FILENAME, RepoRef
+from .pipeline.facts import extract_facts
 
 
 def _add_command(
@@ -53,7 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p = _add_command(
         sub, "extract",
         "Extract deterministic repository facts into repo_facts.json",
-        _cmd_not_implemented,
+        _cmd_extract,
     )
     p.add_argument("url", help="GitHub repository URL (https://github.com/owner/repo)")
     p.add_argument("--ref", help="Branch / tag / sha to analyze (default: default branch)")
@@ -95,6 +98,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--facts", help="Path to repo_facts.json (default: next to the report)")
 
     return parser
+
+
+def _cmd_extract(args: argparse.Namespace, settings: Settings) -> int:
+    ref = RepoRef.from_url(args.url, ref=args.ref)
+    output_dir = args.output_dir or settings.output_dir
+    client = GitHubClient(settings)
+    facts = extract_facts(client, ref, output_dir=output_dir)
+    path = ref.workdir(output_dir) / FACTS_FILENAME
+    langs = ", ".join(l.name for l in facts.languages.languages[:5]) or "n/a"
+    print(f"Extracted facts: {path}")
+    print(f"  repo:        {ref.api_path} ({facts.repo.get('branch')} @ {facts.repo.get('ref_sha', '?')[:10]})")
+    print(f"  languages:   {langs}")
+    print(f"  files:       {facts.files.total_files} (tree truncated: {facts.tree.truncated})")
+    print(f"  manifests:   {len(facts.manifests)}")
+    print(f"  entrypoints: {len(facts.entrypoints)} candidates")
+    print(f"  deps:        {len(facts.dependencies.direct)} direct")
+    print(f"  warnings:    {len(facts.warnings)}")
+    for warning in facts.warnings:
+        print(f"    - {warning}")
+    return 0
 
 
 def _cmd_not_implemented(args: argparse.Namespace, settings: Settings) -> int:

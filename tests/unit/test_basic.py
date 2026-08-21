@@ -175,10 +175,12 @@ def test_cli_unknown_command_fails() -> None:
     assert exc_info.value.code == 2
 
 
-def test_cli_extract_stub_returns_not_implemented(capsys) -> None:
-    code = main(["extract", "https://github.com/pallets/flask"])
+def test_cli_extract_validates_input_before_network(capsys) -> None:
+    # URL parsing happens before any API call, so garbage input fails
+    # fast without touching the network.
+    code = main(["extract", "not-a-url"])
     assert code == 2
-    assert "not implemented" in capsys.readouterr().err
+    assert "Input error" in capsys.readouterr().err
 
 
 def test_parser_exposes_all_subcommands() -> None:

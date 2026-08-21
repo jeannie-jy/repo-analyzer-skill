@@ -1,0 +1,19 @@
+{
+  "id": 54603821,
+  "name": "flask",
+  "full_name": "pallets/flask",
+  "description": "The Python micro framework for building web applications",
+  "stargazers_count": 71123,
+  "forks_count": 16789,
+  "watchers_count": 71123,
+  "license": { "key": "bsd-3-clause", "name": "BSD-3-Clause", "spdx_id": "BSD-3-Clause" },
+  "topics": ["web", "python", "framework", "wsgi"],
+  "created_at": "2010-04-06T14:08:37Z",
+  "pushed_at": "2026-08-01T12:00:00Z",
+  "homepage": "https://flask.palletsprojects.com",
+  "archived": false,
+  "fork": false,
+  "size": 9000,
+  "default_branch": "main",
+  "open_issues_count": 40
+}

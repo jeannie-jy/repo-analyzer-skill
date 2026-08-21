@@ -1,0 +1,26 @@
+{
+  "sha": "tree-sha-1",
+  "truncated": false,
+  "tree": [
+    { "path": "src", "mode": "040000", "type": "tree", "sha": "t-src" },
+    { "path": "src/flask", "mode": "040000", "type": "tree", "sha": "t-flask" },
+    { "path": "src/flask/__init__.py", "mode": "100644", "type": "blob", "size": 800, "sha": "b1" },
+    { "path": "src/flask/app.py", "mode": "100644", "type": "blob", "size": 15000, "sha": "b2" },
+    { "path": "src/flask/cli.py", "mode": "100644", "type": "blob", "size": 6000, "sha": "b3" },
+    { "path": "src/flask/wrappers.py", "mode": "100644", "type": "blob", "size": 9000, "sha": "b4" },
+    { "path": "tests", "mode": "040000", "type": "tree", "sha": "t-tests" },
+    { "path": "tests/test_app.py", "mode": "100644", "type": "blob", "size": 3000, "sha": "b5" },
+    { "path": "package.json", "mode": "100644", "type": "blob", "size": 300, "sha": "b6a" },
+    { "path": "pyproject.toml", "mode": "100644", "type": "blob", "size": 2500, "sha": "b6" },
+    { "path": "requirements.txt", "mode": "100644", "type": "blob", "size": 200, "sha": "b7" },
+    { "path": "README.md", "mode": "100644", "type": "blob", "size": 5000, "sha": "b8" },
+    { "path": "docs", "mode": "040000", "type": "tree", "sha": "t-docs" },
+    { "path": "docs/index.rst", "mode": "100644", "type": "blob", "size": 1000, "sha": "b9" },
+    { "path": "examples", "mode": "040000", "type": "tree", "sha": "t-ex" },
+    { "path": "examples/hello.py", "mode": "100644", "type": "blob", "size": 500, "sha": "b10" },
+    { "path": "node_modules", "mode": "040000", "type": "tree", "sha": "t-nm" },
+    { "path": "node_modules/dep/index.js", "mode": "100644", "type": "blob", "size": 99999, "sha": "b11" },
+    { "path": ".github", "mode": "040000", "type": "tree", "sha": "t-gh" },
+    { "path": ".github/workflows/ci.yml", "mode": "100644", "type": "blob", "size": 700, "sha": "b12" }
+  ]
+}
