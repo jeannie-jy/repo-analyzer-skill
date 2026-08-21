@@ -4,16 +4,22 @@ All runtime configuration flows through this module so that no API key or
 provider URL is ever hard-coded in the codebase. Values are read from the
 environment once, at startup, and passed down explicitly.
 
-Secrets are never logged or echoed back by the CLI.
+A ``.env`` file in the working directory is loaded first (KEY=VALUE lines,
+``#`` comments, no interpolation) — real environment variables always
+take precedence over the file, and the file never overrides an exported
+value. Secrets are never logged or echoed back by the CLI.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Mapping
 
 from .errors import ConfigError
+
+DOTENV_FILENAME = ".env"
 
 DEFAULT_GITHUB_API_URL = "https://api.github.com"
 DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1"
@@ -48,10 +54,14 @@ class Settings:
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
         """Build Settings from ``os.environ`` or an injected mapping.
 
-        Raises ``ConfigError`` for malformed values (e.g. a non-integer
-        TOKEN_BUDGET) so misconfiguration fails fast at startup.
+        When reading the real environment, a ``.env`` file next to the
+        working directory is merged in first (see :func:`load_dotenv`).
+        An injected mapping is used verbatim — tests simulate any
+        environment without touching the real one. Raises ``ConfigError``
+        for malformed values (e.g. a non-integer TOKEN_BUDGET) so
+        misconfiguration fails fast at startup.
         """
-        env = os.environ if env is None else env
+        env = _merge_dotenv(os.environ) if env is None else dict(env)
 
         def get(*names: str) -> str | None:
             for name in names:
@@ -86,5 +96,36 @@ class Settings:
         if not self.llm_api_key:
             raise ConfigError(
                 "LLM API key is missing. Set LLM_API_KEY (or OPENAI_API_KEY) "
-                "in the environment."
+                "in the environment or in a .env file."
             )
+
+
+def load_dotenv(path: str | Path = DOTENV_FILENAME) -> dict[str, str]:
+    """Parse a ``KEY=VALUE`` dotenv file into a dict (never overriding).
+
+    ``#`` comments and blank lines are skipped; values are stripped of
+    surrounding quotes and whitespace. A missing file yields ``{}`` — a
+    dotenv is an optional convenience, never a requirement.
+    """
+    dotenv = Path(path)
+    result: dict[str, str] = {}
+    if not dotenv.is_file():
+        return result
+    for raw in dotenv.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip().strip('"').strip("'")
+        result[key] = value
+    return result
+
+
+def _merge_dotenv(env: Mapping[str, str]) -> dict[str, str]:
+    """Real environment wins over the ``.env`` file, always."""
+    merged = dict(load_dotenv())
+    merged.update(env)
+    return merged

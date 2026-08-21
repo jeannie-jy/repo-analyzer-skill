@@ -14,13 +14,21 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from ..extract.tree import VENDORED_PREFIXES, is_binary_or_lockfile
 from ..github_client import GitHubClient, fetch_file_content
 from ..models import RepoFacts, RepoRef
-from ..extract.tree import VENDORED_PREFIXES
 
 # A single file whose estimated size exceeds this share of the budget is
 # skipped (truncated files confuse reasoning more than they help).
+# Entry points get a wider cap: the core file of a repository is worth
+# more to the LLM than breadth, and hitting its 25% share is what kept
+# real core files (flask's src/flask/app.py) out of the sample.
 MAX_SINGLE_FILE_BUDGET_SHARE = 0.25
+ENTRYPOINT_BUDGET_SHARE = 0.50
+
+# Test directories: deprioritized in the "largest file" tier — tests are
+# downstream consumers of the architecture, not the architecture itself.
+_TEST_DIR_HEADS = ("tests", "test", "spec", "testdata", "e2e")
 
 
 @dataclass(frozen=True)
@@ -83,7 +91,7 @@ def sample_code(
     the same repo + budget always produce the same sample.
     """
     fetch = fetch_fn or fetch_file_content
-    candidates: list[tuple[str, str]] = []  # (path, reason)
+    candidates: list[tuple[str, str, bool]] = []  # (path, reason, is_entrypoint)
 
     entrypoints = sorted(
         (c for c in facts.entrypoints if c.path),
@@ -92,22 +100,30 @@ def sample_code(
     )
     for c in entrypoints:
         assert c.path is not None  # filtered above
-        candidates.append((c.path, f"entrypoint: {c.kind} ({c.confidence:.2f})"))
+        candidates.append(
+            (c.path, f"entrypoint: {c.kind} ({c.confidence:.2f})", True)
+        )
 
     for manifest in facts.manifests:
-        candidates.append((manifest.path, f"manifest: {manifest.kind}"))
+        candidates.append((manifest.path, f"manifest: {manifest.kind}", False))
 
     for entry in facts.files.largest_files:
-        candidates.append((entry.path, f"largest file ({entry.size_bytes} bytes)"))
+        if _is_test_path(entry.path):
+            continue  # tests are consumers of the architecture, not it
+        candidates.append(
+            (entry.path, f"largest file ({entry.size_bytes} bytes)", False)
+        )
 
     seen: set[str] = set()
     skipped: list[str] = []
     sampled: list[SampledFile] = []
     remaining = budget
 
-    for path, reason in candidates:
+    for path, reason, is_entrypoint in candidates:
         if path in seen or _is_vendored(path):
             continue
+        if is_binary_or_lockfile(path):
+            continue  # noise: not a budget decision, just not material
         seen.add(path)
 
         content = fetch(client, ref, branch, path)
@@ -116,10 +132,10 @@ def sample_code(
             continue
 
         tokens = max(1, len(content) // 4)
-        if tokens > budget * MAX_SINGLE_FILE_BUDGET_SHARE:
+        cap = int(budget * (ENTRYPOINT_BUDGET_SHARE if is_entrypoint else MAX_SINGLE_FILE_BUDGET_SHARE))
+        if tokens > cap:
             skipped.append(
-                f"{path} - estimated {tokens} tokens exceeds "
-                f"{int(budget * MAX_SINGLE_FILE_BUDGET_SHARE)} single-file cap"
+                f"{path} - estimated {tokens} tokens exceeds {cap} single-file cap"
             )
             continue
         if tokens > remaining:
@@ -138,6 +154,11 @@ def sample_code(
         remaining -= tokens
 
     return CodeSample(files=sampled, budget=budget, skipped=skipped)
+
+
+def _is_test_path(path: str) -> bool:
+    head = path.split("/")[0]
+    return head in _TEST_DIR_HEADS
 
 
 def _is_vendored(path: str) -> bool:

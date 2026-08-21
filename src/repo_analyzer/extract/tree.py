@@ -16,12 +16,42 @@ The fact layer never *deletes* vendored entries (consumers filter via
 from __future__ import annotations
 
 import urllib.parse
+from pathlib import Path
 
 from ..github_client import GitHubClient
 from ..models import RepoRef, RepoTree, TreeEntry
 
 DEFAULT_MAX_ENTRIES = 20_000
 MAX_TOP_LEVEL_DIRS_TO_EXPAND = 30
+
+# Content that should never be fed to an LLM or counted as code:
+# binary formats (decoding them produces garbage text) and lockfiles
+# (generated, huge, zero architectural signal). Kept here so every
+# consumer filters consistently.
+BINARY_EXTENSIONS = frozenset(
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".pdf", ".zip", ".gz", ".tgz", ".bz2", ".xz", ".tar", ".7z",
+        ".exe", ".dll", ".so", ".dylib", ".pyc", ".class", ".jar", ".war",
+        ".o", ".a", ".bin", ".dat", ".db", ".sqlite", ".parquet",
+    }
+)
+LOCKFILE_NAMES = frozenset(
+    {
+        "package-lock.json", "npm-shrinkwrap.json", "yarn.lock",
+        "pnpm-lock.yaml", "uv.lock", "poetry.lock", "Pipfile.lock",
+        "Cargo.lock", "go.sum", "composer.lock", "Gemfile.lock", "mix.lock",
+    }
+)
+
+
+def is_binary_or_lockfile(path: str) -> bool:
+    """True for binary formats and lockfiles — never LLM- or LOC-material."""
+    if Path(path).name in LOCKFILE_NAMES:
+        return True
+    return Path(path).suffix.lower() in BINARY_EXTENSIONS
+
 
 # Paths we flag as vendored / generated. Kept as *prefixes* so consumers
 # can filter consistently (dependencies, file stats, sampling).

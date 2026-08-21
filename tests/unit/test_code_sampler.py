@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from repo_analyzer.context.code_sampler import sample_code
-from repo_analyzer.models import EntrypointCandidate, RepoFacts, RepoRef
+from repo_analyzer.models import (
+    EntrypointCandidate,
+    FileSize,
+    FileStats,
+    ManifestInfo,
+    RepoFacts,
+    RepoRef,
+)
 from repo_analyzer.pipeline.facts import extract_facts
 
 from .fake_client import FakeClient, contents_response
@@ -76,7 +83,8 @@ def test_budget_exhaustion_stops_sampling() -> None:
 
 
 def test_oversized_single_file_is_capped() -> None:
-    # 4000 chars = ~1000 tokens > 25% of the 3000 budget (750) -> capped.
+    # Manifests (not entry points) obey the 25% cap: big.txt = 4000 chars
+    # = ~1000 tokens > 25% of the 3000 budget (750) -> capped.
     big = "x" * 4000
     small = "y" * 120
     client = (
@@ -85,7 +93,13 @@ def test_oversized_single_file_is_capped() -> None:
         .route("repos/x/y/contents/small.txt", contents_response(small, "small.txt"))
     )
     ref = RepoRef.from_url("https://github.com/x/y")
-    facts = _entrypoint_facts(["big.txt", "small.txt"])
+    facts = RepoFacts(
+        repo={"branch": "main"},
+        manifests=[
+            ManifestInfo(path="big.txt", kind="pip", format="text"),
+            ManifestInfo(path="small.txt", kind="pip", format="text"),
+        ],
+    )
     sample = sample_code(client, ref, "main", facts, budget=3000)
 
     assert [f.path for f in sample.files] == ["small.txt"]
@@ -107,3 +121,61 @@ def test_vendored_paths_excluded(tmp_path) -> None:
     assert _is_vendored("node_modules/dep/index.js")
     assert _is_vendored("vendor/lib/x.c")
     assert not _is_vendored("src/main.py")
+
+
+def test_entrypoints_get_wider_cap_than_other_files() -> None:
+    # big_entry.py = 4000 chars = 1000 tokens. Budget 8000: the 25% cap
+    # (2000) would reject it; the entrypoint cap (50% = 4000) admits it.
+    client = FakeClient().route(
+        "repos/x/y/contents/big_entry.py", contents_response("x" * 4000, "big_entry.py")
+    )
+    ref = RepoRef.from_url("https://github.com/x/y")
+    facts = RepoFacts(
+        repo={"branch": "main"},
+        entrypoints=[
+            EntrypointCandidate(path="big_entry.py", kind="cli", heuristic="test", confidence=1.0)
+        ],
+    )
+    sample = sample_code(client, ref, "main", facts, budget=8000)
+    assert [f.path for f in sample.files] == ["big_entry.py"]
+    assert sample.total_token_estimate == 1000
+
+
+def test_noise_files_are_silently_excluded() -> None:
+    client = FakeClient()
+    client.route("repos/x/y/contents/icon.png", contents_response("x" * 200, "icon.png"))
+    client.route(
+        "repos/x/y/contents/uv.lock", contents_response("x" * 200, "uv.lock")
+    )
+    ref = RepoRef.from_url("https://github.com/x/y")
+    facts = RepoFacts(
+        repo={"branch": "main"},
+        entrypoints=[
+            EntrypointCandidate(path="icon.png", kind="other", heuristic="test", confidence=1.0),
+            EntrypointCandidate(path="uv.lock", kind="other", heuristic="test", confidence=0.9),
+        ],
+    )
+    sample = sample_code(client, ref, "main", facts, budget=40_000)
+    assert sample.files == []
+    assert sample.skipped == []  # noise is filtered, not a budget decision
+    assert client.called_paths() == []  # never fetched
+
+
+def test_test_dir_deprioritized_in_largest_tier() -> None:
+    client = FakeClient()
+    client.route("repos/x/y/contents/core.py", contents_response("x" * 200, "core.py"))
+    client.route(
+        "repos/x/y/contents/tests/test_core.py", contents_response("x" * 400, "tests/test_core.py")
+    )
+    ref = RepoRef.from_url("https://github.com/x/y")
+    facts = RepoFacts(
+        repo={"branch": "main"},
+        files=FileStats(
+            largest_files=[
+                FileSize(path="tests/test_core.py", size_bytes=1000),
+                FileSize(path="core.py", size_bytes=200),
+            ]
+        ),
+    )
+    sample = sample_code(client, ref, "main", facts, budget=40_000)
+    assert [f.path for f in sample.files] == ["core.py"]

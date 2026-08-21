@@ -18,7 +18,7 @@ from typing import Any
 
 from ..github_client import GitHubClient
 from ..models import FileSize, FileStats, RepoRef, RepoTree
-from .tree import VENDORED_PREFIXES
+from .tree import VENDORED_PREFIXES, is_binary_or_lockfile
 
 MAX_LARGEST_FILES = 15
 MAX_LINE_COUNT_FILES = 8
@@ -52,6 +52,8 @@ def extract_file_stats(
 
     line_counts: dict[str, int] = {}
     for entry in largest[:MAX_LINE_COUNT_FILES]:
+        if is_binary_or_lockfile(entry.path):
+            continue  # decoding binaries produces garbage "lines"
         try:
             content = fetch_raw(ref, branch, entry.path)
             line_counts[entry.path] = len(content.splitlines())
