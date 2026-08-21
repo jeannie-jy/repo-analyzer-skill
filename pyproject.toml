@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repo-analyzer-skill"
+version = "0.1.0"
+description = "Reusable Agent Skill that turns any GitHub repository into a structured, evidence-based analysis report"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "jeannie-jy" }]
+keywords = ["agent", "skill", "github", "repository-analysis", "llm", "cli"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Zero runtime dependencies on purpose — the deterministic extraction layer
+# runs on the Python 3.11 stdlib (urllib, tomllib, dataclasses) alone.
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+repo-analyzer = "repo_analyzer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
