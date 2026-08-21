@@ -3,21 +3,22 @@
 Subcommands are the *tools* an agent (or a human) drives the pipeline with:
 
     repo-analyzer extract <url>          deterministic facts -> repo_facts.json
-    repo-analyzer analyze <url>          full pipeline -> analysis.json
+    repo-analyzer analyze <url>          full pipeline -> report.md + report.json
     repo-analyzer sample-code <url>      budgeted code sampling for LLM context
     repo-analyzer validate-report <f>    schema validation
     repo-analyzer verify-evidence <f>    citation checking
 
-Phases 3-4: ``extract`` / ``analyze`` / ``sample-code`` are live; the
-report-validation commands get wired in Phase 5.
+All five commands are live as of Phase 5.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 
 from . import __version__
 from .config import Settings
@@ -25,9 +26,19 @@ from .context.code_sampler import sample_code
 from .errors import ConfigError, InputError, RepoAnalyzerError
 from .github_client import GitHubClient
 from .llm.openai_client import OpenAICompatClient
-from .models import ANALYSIS_FILENAME, FACTS_FILENAME, RepoRef
+from .models import (
+    ANALYSIS_FILENAME,
+    FACTS_FILENAME,
+    REPORT_FILENAME,
+    REPORT_MD_FILENAME,
+    RepoRef,
+    RepoTree,
+    TreeEntry,
+)
 from .pipeline.analyze import analyze
+from .pipeline.evidence import verify_evidence
 from .pipeline.facts import extract_facts
+from .report.schema import validate_analysis
 
 
 def _add_command(
@@ -90,14 +101,14 @@ def _build_parser() -> argparse.ArgumentParser:
     p = _add_command(
         sub, "validate-report",
         "Validate a report.json against the report schema",
-        _cmd_not_implemented,
+        _cmd_validate_report,
     )
     p.add_argument("report", help="Path to report.json")
 
     p = _add_command(
         sub, "verify-evidence",
         "Verify citations in report.json against the repository tree",
-        _cmd_not_implemented,
+        _cmd_verify_evidence,
     )
     p.add_argument("report", help="Path to report.json")
     p.add_argument("--facts", help="Path to repo_facts.json (default: next to the report)")
@@ -142,12 +153,19 @@ def _cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
                     "risks", "contribution_opportunities") if k in result.analysis
     )
     sample = result.sample_manifest
-    path = ref.workdir(output_dir) / ANALYSIS_FILENAME
-    print(f"Analysis written: {path}")
+    workdir = ref.workdir(output_dir)
+    report_path = workdir / REPORT_FILENAME
+    md_path = workdir / REPORT_MD_FILENAME
+    print(f"Analysis written: {workdir / ANALYSIS_FILENAME}")
+    print(f"Report written:   {report_path}")
+    print(f"  markdown:    {md_path}")
     print(f"  model:       {result.model}")
     print(f"  sections:    {', '.join(sections) or 'n/a'}")
     print(f"  code sample: {len(sample['files'])} files, "
           f"{sample['total_token_estimate']:,} / {sample['budget']:,} tokens")
+    evidence = result.report.get("evidence_summary", {})
+    print(f"  grounding:   {evidence.get('verified', 0)}/"
+          f"{evidence.get('total_citations', 0)} citations verified")
     print(f"  unknowns:    {len(result.analysis.get('unknowns', []))}")
     for warning in result.warnings:
         print(f"  warning:     {warning}")
@@ -173,6 +191,52 @@ def _cmd_sample_code(args: argparse.Namespace, settings: Settings) -> int:
     if len(manifest["skipped"]) > 10:
         print(f"  ... and {len(manifest['skipped']) - 10} more skipped")
     return 0
+
+
+def _cmd_validate_report(args: argparse.Namespace, settings: Settings) -> int:
+    data = _load_json(args.report)
+    result = validate_analysis(data.get("analysis", {}))
+    if result.valid:
+        print(f"Report is valid: {args.report}")
+        return 0
+    print(
+        f"Report is INVALID - {len(result.errors)} violation(s): "
+        f"{args.report}",
+        file=sys.stderr,
+    )
+    for error in result.errors:
+        print(f"  - {error}", file=sys.stderr)
+    return 1
+
+
+def _cmd_verify_evidence(args: argparse.Namespace, settings: Settings) -> int:
+    data = _load_json(args.report)
+    facts_path = Path(args.facts) if args.facts else Path(args.report).parent / FACTS_FILENAME
+    facts = _load_json(str(facts_path))
+    tree = RepoTree(
+        entries=[TreeEntry(**e) for e in facts.get("tree", {}).get("entries", [])]
+    )
+    evidence = verify_evidence(data.get("analysis", {}), tree)
+
+    print(f"Citations: {evidence.total_citations} total, "
+          f"{evidence.verified} verified, {evidence.unverified} unverified "
+          f"(grounding {evidence.grounding_ratio:.0%})")
+    for path in evidence.unverified_list:
+        print(f"  unverified: {path}")
+    return 0
+
+
+def _load_json(path: str) -> dict:
+    """Load a JSON artifact, raising InputError on unreadable/invalid files."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise InputError(f"File not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise InputError(f"Invalid JSON in {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise InputError(f"{path} does not contain a JSON object")
+    return data
 
 
 def _cmd_not_implemented(args: argparse.Namespace, settings: Settings) -> int:

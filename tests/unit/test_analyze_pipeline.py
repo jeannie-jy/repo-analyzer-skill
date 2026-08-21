@@ -6,8 +6,13 @@ import json
 
 import pytest
 
-from repo_analyzer.errors import LLMError
-from repo_analyzer.models import ANALYSIS_FILENAME, SAMPLE_MANIFEST_FILENAME
+from repo_analyzer.errors import LLMError, ReportValidationError
+from repo_analyzer.models import (
+    ANALYSIS_FILENAME,
+    REPORT_FILENAME,
+    REPORT_MD_FILENAME,
+    SAMPLE_MANIFEST_FILENAME,
+)
 from repo_analyzer.pipeline.analyze import analyze, _parse_json_response
 
 from .fake_client import FakeClient, contents_response
@@ -26,12 +31,26 @@ VALID_ANALYSIS = {
         "evidence": ["README.md"],
     },
     "tech_stack": [{"category": "framework", "name": "Flask", "role": "web layer", "evidence": ["src/flask/app.py"]}],
+    "structure": {
+        "summary": "src layout",
+        "notable_dirs": [{"path": "src/flask", "purpose": "core package", "evidence": ["src/flask/app.py"]}],
+    },
     "architecture": {
         "summary": "WSGI app with routing",
         "layers": ["application", "routing"],
         "data_flow": [{"from": "client", "to": "app", "mechanism": "HTTP", "evidence": ["src/flask/app.py"]}],
         "patterns": ["factory"],
     },
+    "core_modules": [
+        {
+            "name": "App",
+            "path": "src/flask/app.py",
+            "responsibility": "core object",
+            "key_symbols": [{"symbol": "Flask", "location": "src/flask/app.py"}],
+            "relationships": [{"with": "wrappers", "mechanism": "import", "evidence": ["src/flask/wrappers.py"]}],
+            "evidence": ["src/flask/app.py"],
+        }
+    ],
     "entry_points": [
         {
             "path": "pyproject.toml",
@@ -42,7 +61,17 @@ VALID_ANALYSIS = {
             "evidence": ["pyproject.toml"],
         }
     ],
+    "execution_flow": [{"step": "1", "description": "start server", "evidence": ["src/flask/app.py"]}],
+    "key_files": [{"path": "src/flask/app.py", "why": "core", "evidence": ["src/flask/app.py"]}],
+    "dependencies": {
+        "notable": [{"name": "Werkzeug", "purpose": "WSGI", "evidence": ["pyproject.toml"]}],
+        "concerns": [{"description": "old pins", "evidence": ["requirements.txt"]}],
+    },
     "risks": [{"category": "complexity", "description": "x", "severity": "low", "evidence": ["src/flask/app.py"], "mitigation": "y"}],
+    "reading_order": [{"step": "1", "target": "src/flask/app.py", "why": "core first"}],
+    "contribution_opportunities": [
+        {"area": "tests", "description": "more tests", "difficulty": "low", "related_files": ["tests/test_app.py"], "evidence": ["tests/test_app.py"]}
+    ],
     "unknowns": ["CI behavior"],
 }
 
@@ -92,6 +121,17 @@ def test_analyze_writes_artifacts(tmp_path) -> None:
     # sample contents go to the prompt, never to disk
     assert all("content" not in f for f in on_disk["sample_manifest"]["files"])
 
+    # report.json + report.md are the validated artifacts
+    report_path = workdir / REPORT_FILENAME
+    assert report_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["analysis"] == VALID_ANALYSIS
+    assert report["evidence_summary"]["verified"] >= 1
+    assert report["evidence_summary"]["total_citations"] >= 1
+    md = (workdir / REPORT_MD_FILENAME).read_text(encoding="utf-8")
+    assert "Repository Analysis Report" in md
+    assert "## Risks" in md
+
 
 def test_analyze_tolerates_fenced_json(tmp_path) -> None:
     fenced = f"```json\n{json.dumps(VALID_ANALYSIS)}\n```"
@@ -107,6 +147,13 @@ def test_analyze_tolerates_prose_around_json(tmp_path) -> None:
 def test_analyze_rejects_non_json(tmp_path) -> None:
     with pytest.raises(LLMError, match="no JSON"):
         _run_analyze(tmp_path, "I cannot analyze this repository.")
+
+
+def test_analyze_gates_schema_violations(tmp_path) -> None:
+    # contract-complete but missing a required section -> report is refused
+    broken = {k: v for k, v in VALID_ANALYSIS.items() if k != "risks"}
+    with pytest.raises(ReportValidationError, match="risks"):
+        _run_analyze(tmp_path, json.dumps(broken))
 
 
 def test_analyze_rejects_non_object_json(tmp_path) -> None:

@@ -1,0 +1,516 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "repo-analyzer analysis report",
+  "type": "object",
+  "required": [
+    "overview",
+    "tech_stack",
+    "structure",
+    "architecture",
+    "core_modules",
+    "entry_points",
+    "execution_flow",
+    "key_files",
+    "dependencies",
+    "risks",
+    "reading_order",
+    "contribution_opportunities",
+    "unknowns"
+  ],
+  "properties": {
+    "overview": {
+      "type": "object",
+      "required": [
+        "summary",
+        "purpose",
+        "evidence"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "tech_stack": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "category",
+          "name",
+          "role",
+          "evidence"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "language",
+              "framework",
+              "database",
+              "tooling",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "required": [
+        "summary",
+        "notable_dirs"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "notable_dirs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "purpose",
+              "evidence"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "required": [
+        "summary",
+        "layers",
+        "data_flow",
+        "patterns"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "data_flow": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to",
+              "mechanism",
+              "evidence"
+            ],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "mechanism": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "core_modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "responsibility",
+          "key_symbols",
+          "relationships",
+          "evidence"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "responsibility": {
+            "type": "string"
+          },
+          "key_symbols": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "symbol",
+                "location"
+              ],
+              "properties": {
+                "symbol": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "with",
+                "mechanism",
+                "evidence"
+              ],
+              "properties": {
+                "with": {
+                  "type": "string"
+                },
+                "mechanism": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "entry_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "kind",
+          "invocation",
+          "confidence",
+          "rationale",
+          "evidence"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cli",
+              "http_server",
+              "worker",
+              "library_api",
+              "scheduler",
+              "other"
+            ]
+          },
+          "invocation": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "execution_flow": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step",
+          "description",
+          "evidence"
+        ],
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "key_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "why",
+          "evidence"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "required": [
+        "notable",
+        "concerns"
+      ],
+      "properties": {
+        "notable": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "purpose",
+              "evidence"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "concerns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "description",
+              "evidence"
+            ],
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "category",
+          "description",
+          "severity",
+          "evidence",
+          "mitigation"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "mitigation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reading_order": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step",
+          "target",
+          "why"
+        ],
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "contribution_opportunities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "area",
+          "description",
+          "difficulty",
+          "related_files",
+          "evidence"
+        ],
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "related_files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
