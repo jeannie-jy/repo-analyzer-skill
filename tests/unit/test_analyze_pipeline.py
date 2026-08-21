@@ -1,0 +1,127 @@
+"""Full analyze pipeline: extract -> sample -> LLM -> artifacts on disk."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from repo_analyzer.errors import LLMError
+from repo_analyzer.models import ANALYSIS_FILENAME, SAMPLE_MANIFEST_FILENAME
+from repo_analyzer.pipeline.analyze import analyze, _parse_json_response
+
+from .fake_client import FakeClient, contents_response
+from .fake_llm import FakeLLM
+from .test_facts_pipeline import REF, _full_client, _noop_raw
+
+SAMPLE_CODE = (
+    "from flask import Flask\n\napp = Flask(__name__)\n\n"
+    "@app.route('/')\ndef index():\n    return 'hello'\n"
+)
+
+VALID_ANALYSIS = {
+    "overview": {
+        "summary": "A micro web framework",
+        "purpose": "Building web apps",
+        "evidence": ["README.md"],
+    },
+    "tech_stack": [{"category": "framework", "name": "Flask", "role": "web layer", "evidence": ["src/flask/app.py"]}],
+    "architecture": {
+        "summary": "WSGI app with routing",
+        "layers": ["application", "routing"],
+        "data_flow": [{"from": "client", "to": "app", "mechanism": "HTTP", "evidence": ["src/flask/app.py"]}],
+        "patterns": ["factory"],
+    },
+    "entry_points": [
+        {
+            "path": "pyproject.toml",
+            "kind": "cli",
+            "invocation": "flask",
+            "confidence": 0.95,
+            "rationale": "PEP 621 entry",
+            "evidence": ["pyproject.toml"],
+        }
+    ],
+    "risks": [{"category": "complexity", "description": "x", "severity": "low", "evidence": ["src/flask/app.py"], "mitigation": "y"}],
+    "unknowns": ["CI behavior"],
+}
+
+
+def _client_with_app() -> FakeClient:
+    return _full_client().route(
+        "repos/pallets/flask/contents/src/flask/app.py",
+        contents_response(SAMPLE_CODE, "src/flask/app.py"),
+    )
+
+
+def _run_analyze(tmp_path, response: str | Exception):
+    llm = FakeLLM([response])
+    result = analyze(
+        _client_with_app(),
+        llm,
+        REF,
+        output_dir=tmp_path,
+        budget=40_000,
+        fetch_raw_fn=_noop_raw,
+    )
+    return result, llm
+
+
+def test_analyze_writes_artifacts(tmp_path) -> None:
+    result, llm = _run_analyze(tmp_path, json.dumps(VALID_ANALYSIS))
+
+    assert result.analysis == VALID_ANALYSIS
+    assert result.model == "fake-model"
+    assert result.schema_version == "1.0"
+    assert result.repo["branch"] == "main"
+
+    # the LLM was handed facts + sample in a two-message conversation
+    assert len(llm.calls) == 1
+    assert [m["role"] for m in llm.calls[0]] == ["system", "user"]
+    assert "Werkzeug" in llm.calls[0][1]["content"]
+
+    workdir = tmp_path / "repos" / "pallets" / "flask"
+    analysis_path = workdir / ANALYSIS_FILENAME
+    manifest_path = workdir / SAMPLE_MANIFEST_FILENAME
+    assert analysis_path.exists()
+    assert manifest_path.exists()
+
+    on_disk = json.loads(analysis_path.read_text(encoding="utf-8"))
+    assert on_disk["analysis"] == VALID_ANALYSIS
+    assert on_disk["sample_manifest"]["files"][0]["path"] == "pyproject.toml"
+    # sample contents go to the prompt, never to disk
+    assert all("content" not in f for f in on_disk["sample_manifest"]["files"])
+
+
+def test_analyze_tolerates_fenced_json(tmp_path) -> None:
+    fenced = f"```json\n{json.dumps(VALID_ANALYSIS)}\n```"
+    result, _ = _run_analyze(tmp_path, fenced)
+    assert result.analysis == VALID_ANALYSIS
+
+
+def test_analyze_tolerates_prose_around_json(tmp_path) -> None:
+    result, _ = _run_analyze(tmp_path, f"Here you go:\n{json.dumps(VALID_ANALYSIS)}")
+    assert result.analysis == VALID_ANALYSIS
+
+
+def test_analyze_rejects_non_json(tmp_path) -> None:
+    with pytest.raises(LLMError, match="no JSON"):
+        _run_analyze(tmp_path, "I cannot analyze this repository.")
+
+
+def test_analyze_rejects_non_object_json(tmp_path) -> None:
+    with pytest.raises(LLMError, match="not an object"):
+        _run_analyze(tmp_path, json.dumps([1, 2, 3]))
+
+
+def test_analyze_propagates_llm_errors(tmp_path) -> None:
+    with pytest.raises(LLMError):
+        _run_analyze(tmp_path, LLMError("provider down"))
+
+
+def test_parse_json_response_unit() -> None:
+    assert _parse_json_response('{"a": 1}') == {"a": 1}
+    assert _parse_json_response('```json\n{"a": 1}\n```') == {"a": 1}
+    assert _parse_json_response('note: {"a": 1}') == {"a": 1}
+    with pytest.raises(LLMError):
+        _parse_json_response("no json here")

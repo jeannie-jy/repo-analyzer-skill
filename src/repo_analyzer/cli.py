@@ -3,13 +3,13 @@
 Subcommands are the *tools* an agent (or a human) drives the pipeline with:
 
     repo-analyzer extract <url>          deterministic facts -> repo_facts.json
-    repo-analyzer analyze <url>          full pipeline -> report.md + report.json
+    repo-analyzer analyze <url>          full pipeline -> analysis.json
     repo-analyzer sample-code <url>      budgeted code sampling for LLM context
     repo-analyzer validate-report <f>    schema validation
     repo-analyzer verify-evidence <f>    citation checking
 
-Phase 2: the command tree and error handling are live; handlers are stubs
-that get wired to the pipeline in Phases 3-5.
+Phases 3-4: ``extract`` / ``analyze`` / ``sample-code`` are live; the
+report-validation commands get wired in Phase 5.
 """
 
 from __future__ import annotations
@@ -17,13 +17,16 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from typing import Any
+from dataclasses import replace
 
 from . import __version__
 from .config import Settings
-from .errors import ConfigError, ExtractionError, InputError, RepoAnalyzerError
+from .context.code_sampler import sample_code
+from .errors import ConfigError, InputError, RepoAnalyzerError
 from .github_client import GitHubClient
-from .models import FACTS_FILENAME, RepoRef
+from .llm.openai_client import OpenAICompatClient
+from .models import ANALYSIS_FILENAME, FACTS_FILENAME, RepoRef
+from .pipeline.analyze import analyze
 from .pipeline.facts import extract_facts
 
 
@@ -65,8 +68,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # --- Phase 4: LLM reasoning pipeline ----------------------------------
     p = _add_command(
         sub, "analyze",
-        "Run the full analysis pipeline (extract + LLM reasoning + report)",
-        _cmd_not_implemented,
+        "Run the full analysis pipeline (extract + LLM reasoning)",
+        _cmd_analyze,
     )
     p.add_argument("url", help="GitHub repository URL")
     p.add_argument("--ref", help="Branch / tag / sha to analyze (default: default branch)")
@@ -76,9 +79,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p = _add_command(
         sub, "sample-code",
         "Fetch budgeted code samples for LLM context",
-        _cmd_not_implemented,
+        _cmd_sample_code,
     )
     p.add_argument("url", help="GitHub repository URL")
+    p.add_argument("--ref", help="Branch / tag / sha to analyze (default: default branch)")
+    p.add_argument("--output-dir", "-o", help="Override output directory")
     p.add_argument("--budget", type=int, help="Override code sampling token budget")
 
     # --- Phase 5: report validation ---------------------------------------
@@ -117,6 +122,56 @@ def _cmd_extract(args: argparse.Namespace, settings: Settings) -> int:
     print(f"  warnings:    {len(facts.warnings)}")
     for warning in facts.warnings:
         print(f"    - {warning}")
+    return 0
+
+
+def _cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
+    settings.require_llm()  # ConfigError -> exit 2, fail fast before any API call
+    if args.budget:
+        settings = replace(settings, token_budget=args.budget)
+    ref = RepoRef.from_url(args.url, ref=args.ref)
+    output_dir = args.output_dir or settings.output_dir
+    client = GitHubClient(settings)
+    llm = OpenAICompatClient(settings)
+    result = analyze(
+        client, llm, ref, output_dir=output_dir, budget=settings.token_budget
+    )
+
+    sections = sorted(
+        k for k in ("overview", "architecture", "core_modules", "entry_points",
+                    "risks", "contribution_opportunities") if k in result.analysis
+    )
+    sample = result.sample_manifest
+    path = ref.workdir(output_dir) / ANALYSIS_FILENAME
+    print(f"Analysis written: {path}")
+    print(f"  model:       {result.model}")
+    print(f"  sections:    {', '.join(sections) or 'n/a'}")
+    print(f"  code sample: {len(sample['files'])} files, "
+          f"{sample['total_token_estimate']:,} / {sample['budget']:,} tokens")
+    print(f"  unknowns:    {len(result.analysis.get('unknowns', []))}")
+    for warning in result.warnings:
+        print(f"  warning:     {warning}")
+    return 0
+
+
+def _cmd_sample_code(args: argparse.Namespace, settings: Settings) -> int:
+    ref = RepoRef.from_url(args.url, ref=args.ref)
+    output_dir = args.output_dir or settings.output_dir
+    budget = args.budget or settings.token_budget
+    client = GitHubClient(settings)
+    facts = extract_facts(client, ref, output_dir=output_dir)
+    branch = facts.repo.get("branch") or "main"
+    sample = sample_code(client, ref, branch, facts, budget=budget)
+    manifest = sample.to_manifest()
+
+    print(f"Sampled {len(manifest['files'])} files "
+          f"({manifest['total_token_estimate']:,} / {budget:,} tokens):")
+    for file in manifest["files"]:
+        print(f"  {file['path']:45s} ~{file['token_estimate']:>6,} tokens  {file['reason']}")
+    for entry in manifest["skipped"][:10]:
+        print(f"  skipped: {entry}")
+    if len(manifest["skipped"]) > 10:
+        print(f"  ... and {len(manifest['skipped']) - 10} more skipped")
     return 0
 
 

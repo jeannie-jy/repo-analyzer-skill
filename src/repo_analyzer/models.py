@@ -24,6 +24,7 @@ GITHUB_URL_RE = re.compile(
 
 # Names of the artifacts written under <output_dir>/repos/<owner>/<repo>/
 FACTS_FILENAME = "repo_facts.json"
+ANALYSIS_FILENAME = "analysis.json"
 REPORT_FILENAME = "report.json"
 REPORT_MD_FILENAME = "report.md"
 SAMPLE_MANIFEST_FILENAME = "sample_manifest.json"
