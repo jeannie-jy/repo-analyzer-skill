@@ -4,7 +4,7 @@ English | [中文](README.zh-CN.md)
 
 **What:** An Agent Skill that turns any GitHub repository (or local clone) into a structured, evidence-based analysis report — architecture, module relationships, entry points, execution flow, risks, and contribution opportunities — with every claim carrying a file-path citation that is mechanically verified before the report ships.
 
-Zero runtime dependencies. Stdlib only. 199 tests.
+Zero runtime dependencies. Stdlib only. 
 
 ---
 
@@ -27,6 +27,43 @@ cd repo-analyzer-skill
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"                              # zero runtime deps; pytest for dev
 ```
+
+## Usage
+
+### Configure
+
+```bash
+export GITHUB_TOKEN=...      # optional but recommended (60 -> 5000 req/hr)
+export LLM_BASE_URL=...      # any OpenAI-compatible endpoint
+export LLM_API_KEY=...       # needed for analyze / eval --judge
+export LLM_MODEL=...
+```
+
+Or write the same keys to `.env` (gitignored). Full list in [.env.example](.env.example).
+
+### Commands
+
+```bash
+repo-analyzer extract <url|path>                  # deterministic facts -> repo_facts.json
+repo-analyzer sample-code <url|path> --budget 40000
+repo-analyzer analyze <url|path>                  # full pipeline -> report.md + report.json
+repo-analyzer validate-report output/repos/.../report.json
+repo-analyzer verify-evidence output/repos/.../report.json
+repo-analyzer eval --judge                        # score reports against gold cases
+```
+
+Local paths need no token and no network: `repo-analyzer extract /path/to/repo`.
+
+### Use as an Agent Skill
+
+Copy (or symlink) `SKILL.md` + `skill/` + `schemas/` into your agent's skills directory:
+
+```bash
+mkdir -p ~/.claude/skills/repo-analyzer           # Claude Code
+cp -r SKILL.md skill schemas docs evals ~/.claude/skills/repo-analyzer/
+```
+
+The agent then resolves the input, runs the deterministic CLI stages, reasons over facts + sampled code in four prompt sections, validates its 13-key JSON (repair loop), and verifies every citation — **no `LLM_API_KEY` needed**, since the reasoning IS the agent. Codex (`~/.codex/skills/`) and other SKILL.md-compatible agents work the same way.
 
 ## Demo
 
@@ -152,43 +189,6 @@ Six metrics against hand-annotated gold cases (`repo-analyzer eval`, see [evals/
 | pallets/click | pure Python library | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
 
 What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape (gum's single-entry CLI is the best case; click's library-only layout has no deterministically detectable entry — the LLM phase names the import surface, recorded in the case README); the hardest guarantee, 0% hallucination, holds on the flask report; the judge rates the report useful (4/5) with direct-evidence tightening as the next lever.
-
-## Usage
-
-### Configure
-
-```bash
-export GITHUB_TOKEN=...      # optional but recommended (60 -> 5000 req/hr)
-export LLM_BASE_URL=...      # any OpenAI-compatible endpoint
-export LLM_API_KEY=...       # needed for analyze / eval --judge
-export LLM_MODEL=...
-```
-
-Or write the same keys to `.env` (gitignored). Full list in [.env.example](.env.example).
-
-### Commands
-
-```bash
-repo-analyzer extract <url|path>                  # deterministic facts -> repo_facts.json
-repo-analyzer sample-code <url|path> --budget 40000
-repo-analyzer analyze <url|path>                  # full pipeline -> report.md + report.json
-repo-analyzer validate-report output/repos/.../report.json
-repo-analyzer verify-evidence output/repos/.../report.json
-repo-analyzer eval --judge                        # score reports against gold cases
-```
-
-Local paths need no token and no network: `repo-analyzer extract /path/to/repo`.
-
-### Use as an Agent Skill
-
-Copy (or symlink) `SKILL.md` + `skill/` + `schemas/` into your agent's skills directory:
-
-```bash
-mkdir -p ~/.claude/skills/repo-analyzer           # Claude Code
-cp -r SKILL.md skill schemas docs evals ~/.claude/skills/repo-analyzer/
-```
-
-The agent then resolves the input, runs the deterministic CLI stages, reasons over facts + sampled code in four prompt sections, validates its 13-key JSON (repair loop), and verifies every citation — **no `LLM_API_KEY` needed**, since the reasoning IS the agent. Codex (`~/.codex/skills/`) and other SKILL.md-compatible agents work the same way.
 
 ## Roadmap
 

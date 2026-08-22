@@ -4,7 +4,7 @@
 
 **它是什么：** 一个 Agent Skill，把任意 GitHub 仓库（或本地克隆）转化为结构化、基于证据的分析报告 —— 架构、模块关系、入口、执行流、风险、贡献机会 —— 每条断言都携带文件路径引用，报告发布前会被机械校验。
 
-零运行时依赖，仅标准库。199 个测试。
+零运行时依赖，仅标准库。
 
 ---
 
@@ -26,6 +26,43 @@ cd repo-analyzer-skill
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"                              # 零运行时依赖；pytest 仅用于开发
 ```
+
+## 使用
+
+### 配置
+
+```bash
+export GITHUB_TOKEN=...      # 可选但强烈建议（60 -> 5000 次/小时）
+export LLM_BASE_URL=...      # 任意 OpenAI 兼容端点
+export LLM_API_KEY=...       # analyze / eval --judge 需要
+export LLM_MODEL=...
+```
+
+同样的键也可写入 `.env`（已 gitignore）。完整列表见 [.env.example](.env.example)。
+
+### 命令
+
+```bash
+repo-analyzer extract <url|path>                  # 确定性事实 -> repo_facts.json
+repo-analyzer sample-code <url|path> --budget 40000
+repo-analyzer analyze <url|path>                  # 完整管线 -> report.md + report.json
+repo-analyzer validate-report output/repos/.../report.json
+repo-analyzer verify-evidence output/repos/.../report.json
+repo-analyzer eval --judge                        # 对照 gold cases 打分
+```
+
+本地路径不需要 token、不需要网络：`repo-analyzer extract /path/to/repo`。
+
+### 作为 Agent Skill 使用
+
+把 `SKILL.md` + `skill/` + `schemas/` 复制（或软链）进你的 agent 的 skills 目录：
+
+```bash
+mkdir -p ~/.claude/skills/repo-analyzer           # Claude Code
+cp -r SKILL.md skill schemas docs evals ~/.claude/skills/repo-analyzer/
+```
+
+agent 随后自行解析输入、跑确定性 CLI 阶段、按四个 prompt section 对事实 + 采样代码推理、校验 13-key JSON（修复循环）、验证每条引用——**不需要 `LLM_API_KEY`**，因为推理者就是 agent 自己。Codex（`~/.codex/skills/`）等兼容 SKILL.md 的 agent 同理。
 
 ## 演示
 
@@ -151,43 +188,6 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 | pallets/click | 纯 Python 库 | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
 
 数字的含义：结构提取完全准确；入口 F1 跟随仓库形态（gum 的单入口 CLI 是最好情形；click 的纯库布局没有可确定性检测的入口——LLM 阶段会点名导入面，记录在 case README）；最硬的保证——0% 幻觉——在 flask 报告上成立；judge 给报告打 4/5 分，下一杠杆是收紧直接证据规则。
-
-## 使用
-
-### 配置
-
-```bash
-export GITHUB_TOKEN=...      # 可选但强烈建议（60 -> 5000 次/小时）
-export LLM_BASE_URL=...      # 任意 OpenAI 兼容端点
-export LLM_API_KEY=...       # analyze / eval --judge 需要
-export LLM_MODEL=...
-```
-
-同样的键也可写入 `.env`（已 gitignore）。完整列表见 [.env.example](.env.example)。
-
-### 命令
-
-```bash
-repo-analyzer extract <url|path>                  # 确定性事实 -> repo_facts.json
-repo-analyzer sample-code <url|path> --budget 40000
-repo-analyzer analyze <url|path>                  # 完整管线 -> report.md + report.json
-repo-analyzer validate-report output/repos/.../report.json
-repo-analyzer verify-evidence output/repos/.../report.json
-repo-analyzer eval --judge                        # 对照 gold cases 打分
-```
-
-本地路径不需要 token、不需要网络：`repo-analyzer extract /path/to/repo`。
-
-### 作为 Agent Skill 使用
-
-把 `SKILL.md` + `skill/` + `schemas/` 复制（或软链）进你的 agent 的 skills 目录：
-
-```bash
-mkdir -p ~/.claude/skills/repo-analyzer           # Claude Code
-cp -r SKILL.md skill schemas docs evals ~/.claude/skills/repo-analyzer/
-```
-
-agent 随后自行解析输入、跑确定性 CLI 阶段、按四个 prompt section 对事实 + 采样代码推理、校验 13-key JSON（修复循环）、验证每条引用——**不需要 `LLM_API_KEY`**，因为推理者就是 agent 自己。Codex（`~/.codex/skills/`）等兼容 SKILL.md 的 agent 同理。
 
 ## Roadmap
 
