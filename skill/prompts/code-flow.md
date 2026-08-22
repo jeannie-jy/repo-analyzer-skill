@@ -30,8 +30,15 @@
 
 ## Evidence rules (apply to every claim you make)
 
-- Every claim MUST carry `evidence`: an array of file paths that exist in
-  the facts. Quote paths exactly as they appear in the digest.
+- Every claim MUST carry `evidence`: an array of file paths from the
+  facts (tree paths, manifest paths, sampled file paths). Quote paths
+  exactly as they appear in the digest.
+- Evidence must be DIRECT: the cited file's content must itself show the
+  claim (a class definition, a dependency entry, a registration call). A
+  path that only relates to the claim without proving it is indirect —
+  replace it with the file that demonstrates the claim, or move the
+  claim to `unknowns`. A claim restating a verified fact from the digest
+  is directly supported by the path the digest attributes it to.
 - When you change a candidate's confidence or drop it, ground that in
   sampled code; otherwise keep the deterministic confidence.
 - Unknown or unverifiable → `unknowns`, never guess.

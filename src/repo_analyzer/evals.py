@@ -40,7 +40,10 @@ report on four criteria and overall usefulness, each 1-5 (5 = best):
 - coverage: does it address all major aspects of this repository
   (purpose, architecture, entry points, risks, contribution paths)?
 - grounding: are claims tied to the cited evidence file paths, with no
-  unsupported assertions?
+  unsupported assertions? Evidence must directly support its claim: the
+  cited file's content shows the claim itself. A citation that merely
+  implies the claim (the file relates, but its content does not prove
+  it) counts against grounding.
 - correctness: are the technical claims accurate for this codebase
   (no invented APIs, wrong data flows, or guessed numbers)?
 - actionability: are the risks and contribution opportunities concrete

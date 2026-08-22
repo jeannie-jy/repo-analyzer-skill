@@ -53,6 +53,7 @@ def test_messages_have_system_and_user_roles(tmp_path) -> None:
     system = messages[0]["content"]
     assert "IRON RULES" in system
     assert "evidence" in system
+    assert "must be DIRECT" in system
     user = messages[1]["content"]
     assert "CODE SAMPLE" in user
     assert "src/flask/app.py" in user or "pyproject.toml" in user
@@ -71,6 +72,16 @@ def test_render_sample_marks_fences_and_tokens(tmp_path) -> None:
     assert "(~" in rendered and "tokens)" in rendered
 
 
+def test_all_prompt_sections_share_the_directness_rule() -> None:
+    """Every reasoning section carries the unified direct-evidence rule;
+    a section that drifts from it fails here, not at eval time."""
+    sections = load_prompt_sections()
+    assert len(sections) == 4
+    for section in sections:
+        assert "Evidence must be DIRECT" in section
+        assert "claim to `unknowns`" in section  # the replace-or-unknowns escape hatch
+
+
 def test_prompt_dir_override_and_fallback(tmp_path) -> None:
     custom = tmp_path / "prompts"
     custom.mkdir()
@@ -84,3 +95,4 @@ def test_prompt_dir_override_and_fallback(tmp_path) -> None:
     fallback = load_prompt_sections(empty)
     assert len(fallback) == 1
     assert "Output only JSON" in fallback[0]
+    assert "directly support" in fallback[0]

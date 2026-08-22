@@ -33,13 +33,28 @@ Reason about the repository's purpose and architecture:
 
 ## Evidence rules (apply to every claim you make)
 
-- Every claim MUST carry `evidence`: an array of file paths from the facts
-  (tree paths, manifest paths, or sampled file paths). Quote paths exactly
-  as they appear in the digest.
+- Every claim MUST carry `evidence`: an array of file paths from the
+  facts (tree paths, manifest paths, sampled file paths). Quote paths
+  exactly as they appear in the digest.
+- Evidence must be DIRECT: the cited file's content must itself show the
+  claim (a class definition, a dependency entry, a registration call). A
+  path that only relates to the claim without proving it is indirect —
+  replace it with the file that demonstrates the claim, or move the
+  claim to `unknowns`. A claim restating a verified fact from the digest
+  is directly supported by the path the digest attributes it to.
 - Do not invent facts. If a number (stars, file counts, dependency versions)
   is in the facts digest, cite it verbatim. If something is not in the facts
   or the samples, say so in `unknowns` — never guess.
 - Do not use more than 4 evidence paths per claim.
+
+Example (Flask): the claim "Flask ships a 'flask' console command" is
+DIRECTLY supported by `pyproject.toml` (the [project].scripts entry
+`flask = flask.cli:main` is literally in that file); citing
+`src/flask/cli.py` for that claim is indirect (it implements the CLI but
+registers no command name). The claim "Click provides the CLI framework
+(FlaskGroup subclasses click.Group)" is DIRECTLY supported by
+`src/flask/cli.py`; citing `pyproject.toml` for it is indirect (a
+dependency-list entry only implies Click is used).
 
 ## Output contract
 

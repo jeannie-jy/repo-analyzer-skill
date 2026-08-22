@@ -159,6 +159,7 @@ def test_judge_report_parses_scores() -> None:
     # the judge saw the report and the rubric in its messages
     system = llm.calls[0][0]["content"]
     assert "coverage" in system and "usefulness" in system
+    assert "directly support" in system
     assert "# Report" in llm.calls[0][1]["content"]
 
 

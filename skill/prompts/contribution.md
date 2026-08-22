@@ -19,8 +19,15 @@ Propose concrete, actionable contribution opportunities for a newcomer:
 
 ## Evidence rules
 
-- Every opportunity MUST carry `evidence`: an array of file paths from
-  the facts.
+- Every claim MUST carry `evidence`: an array of file paths from the
+  facts (tree paths, manifest paths, sampled file paths). Quote paths
+  exactly as they appear in the digest.
+- Evidence must be DIRECT: the cited file's content must itself show the
+  claim (a class definition, a dependency entry, a registration call). A
+  path that only relates to the claim without proving it is indirect —
+  replace it with the file that demonstrates the claim, or move the
+  claim to `unknowns`. A claim restating a verified fact from the digest
+  is directly supported by the path the digest attributes it to.
 - "Low difficulty" means a bounded change in one file; be honest about
   scope — a claim of easy work that isn't is worse than no claim.
 

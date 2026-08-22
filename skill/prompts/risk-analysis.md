@@ -27,7 +27,15 @@
 
 ## Evidence rules (apply to every claim you make)
 
-- Every claim MUST carry `evidence`: an array of file paths from the facts.
+- Every claim MUST carry `evidence`: an array of file paths from the
+  facts (tree paths, manifest paths, sampled file paths). Quote paths
+  exactly as they appear in the digest.
+- Evidence must be DIRECT: the cited file's content must itself show the
+  claim (a class definition, a dependency entry, a registration call). A
+  path that only relates to the claim without proving it is indirect —
+  replace it with the file that demonstrates the claim, or move the
+  claim to `unknowns`. A claim restating a verified fact from the digest
+  is directly supported by the path the digest attributes it to.
 - Severity and risk statements must be traceable to evidence; speculative
   concerns belong in `unknowns`, not in `risks`.
 - Numbers (file sizes, counts, dates) come from the digest verbatim.

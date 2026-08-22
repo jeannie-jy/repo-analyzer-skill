@@ -43,6 +43,13 @@ IRON RULES:
   risks, reading_order, contribution_opportunities, unknowns.
 - Every claim carries an "evidence" array of file paths that exist in the
   facts or the sample. Quote paths exactly as written in the digest.
+- Evidence must be DIRECT: the cited file's content must itself show the
+  claim (a class definition, a dependency entry, a registration call). A
+  path that only relates to the claim without proving it is indirect
+  evidence — replace it with the file that demonstrates the claim, or
+  move the claim to "unknowns". A claim restating a verified fact from
+  the digest is directly supported by the path the digest attributes it
+  to.
 - Never invent facts, numbers, or files. Anything unanswerable from the
   digest or sample goes into "unknowns".
 - Never repeat or guess metadata the digest already provides (stars,
@@ -59,8 +66,10 @@ digest (verified ground truth) and a code sample. Produce a JSON analysis
 with keys: overview, tech_stack, structure, architecture, core_modules,
 entry_points, execution_flow, key_files, dependencies, risks,
 reading_order, contribution_opportunities, unknowns. Every claim must
-carry an "evidence" array of file paths from the digest or sample; never
-invent facts; put unanswered questions in "unknowns". Output only JSON."""
+carry an "evidence" array of file paths from the digest or sample, and
+the cited file's content must directly support the claim (not merely
+relate to it); never invent facts; put unanswered questions in
+"unknowns". Output only JSON."""
 
 
 def load_prompt_sections(prompt_dir: str | Path | None = None) -> list[str]:
