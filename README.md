@@ -4,8 +4,6 @@ English | [中文](README.zh-CN.md)
 
 **What:** An Agent Skill that turns any GitHub repository (or local clone) into a structured, evidence-based analysis report — architecture, module relationships, entry points, execution flow, risks, and contribution opportunities — with every claim carrying a file-path citation that is mechanically verified before the report ships.
 
-Zero runtime dependencies. Stdlib only. 
-
 ---
 
 ## Why
