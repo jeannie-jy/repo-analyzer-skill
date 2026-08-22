@@ -100,7 +100,7 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 - **预算化上下文** — LLM 从不见整个仓库；采样确定性、逐文件可审计。
 - **LLM 无关** — 任意 OpenAI 兼容端点（`LLM_BASE_URL` + `LLM_API_KEY`）；支持推理模型（`LLM_REASONING_EFFORT`、`LLM_MAX_OUTPUT_TOKENS`）。
 - **诚实降级** — metadata 失败是硬错误；其余降级为警告 + 默认值，绝不沉默。限流时透出 `Retry-After`，不做盲重试。
-- **零依赖** — Python 3.11+ 仅标准库（tomllib、JSON、urllib、subprocess）。
+- **零依赖** — Python 3.11+ 仅标准库（TOML 用 `tomllib`、JSON、urllib、subprocess）。
 - **六个 CLI 子命令** — `extract`、`analyze`、`sample-code`、`validate-report`、`verify-evidence`、`eval`。
 
 ## 设计决策
