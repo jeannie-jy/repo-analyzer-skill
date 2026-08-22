@@ -1,5 +1,7 @@
 # repo-analyzer-skill
 
+English | [中文](README.zh-CN.md)
+
 A reusable **Agent Skill** that turns any GitHub repository into a structured, evidence-based analysis report.
 
 Given a repository URL, it:
