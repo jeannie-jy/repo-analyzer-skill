@@ -18,7 +18,6 @@ This project exists to make codebase understanding **fast, grounded, and auditab
 - **Grounded** — the LLM never guesses what scripts can determine (language shares, dependency versions, file counts). Every claim must cite a file path that exists.
 - **Auditable** — a 13-section report plus an automated evidence check (`verify-evidence`) and a six-metric evaluation harness (`eval`). If a claim cannot be verified, it goes in `unknowns` — never in the report.
 
-It also serves as a working demonstration of Agent Engineering: skill design, deterministic/LLM boundary decisions, context management under token budgets, structured output with repair loops, tool design, and evaluation.
 
 ## Demo
 
@@ -27,7 +26,7 @@ Local mode — zero GitHub API calls, zero tokens, zero setup:
 ```
 $ repo-analyzer extract .
 Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
-  repo:        local/repo-analyzer-skill (main @ 6a3f1ad931)
+  repo:        local/repo-analyzer-skill (main @ 112d59bb60)
   languages:   Python, JSON, Markdown, TOML
   files:       95 (tree truncated: False)
   manifests:   1
@@ -41,12 +40,12 @@ What the LLM reasoning layer produces (real report, `examples/reports/pallets-fl
 
 > **Summary:** Flask is a lightweight WSGI web application framework for Python, built on top of Werkzeug for WSGI/routing and Jinja2 for templating. It is the core library package (version 3.2.0.dev) that developers import to build web apps.
 >
-> **Purpose:** Developers use Flask to construct web applications by creating a Flask app object, registering routes/view functions, using blueprints for modularity, handling requests/responses, and serving templates and static files.
+> **Purpose:** Developers use Flask to construct web applications by creating a Flask app object, registering routes/view functions, using blueprints for modularity, handling requests/responses, and serving templates and static files. It serves as both a library API and a CLI tool ('flask' command) for running a development server.
 > Evidence: `README.md` `pyproject.toml` `src/flask/app.py` `src/flask/cli.py`
 
 | Category | Technology | Role |
 |---|---|---|
-| framework | Werkzeug | Provides WSGI utilities, routing (Map, Rule, MapAdapter), HTTP exceptions, and the dev server (werkzeug.serving.run_simple) used by Flask's request/response cycle. [`src/flask/app.py`] [`src/flask/sansio/app.py`] [`pyproject.toml`] |
+| framework | Werkzeug | Provides WSGI utilities, routing (Map, Rule, MapAdapter), HTTP exceptions, and the dev server (werkzeug.serving.run_simple) used by Flask's core request/response cycle. [`src/flask/app.py`] [`src/flask/sansio/app.py`] [`pyproject.toml`] |
 | framework | Click | CLI framework; the 'flask' console script is registered as flask.cli:main, and FlaskGroup/AppGroup subclass click.Group to build the CLI command tree. [`pyproject.toml`] [`src/flask/cli.py`] |
 
 ## Architecture

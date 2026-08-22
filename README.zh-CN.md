@@ -18,8 +18,6 @@
 - **可考证** —— LLM 绝不猜测脚本能确定的事实（语言占比、依赖版本、文件数）。每条断言必须引用真实存在的文件路径。
 - **可审计** —— 13 节报告 + 自动化证据校验（`verify-evidence`）+ 六指标评估框架（`eval`）。验证不了的断言进 `unknowns`，绝不进报告。
 
-它同时也是 Agent Engineering 的工作演示：Skill 设计、确定性/LLM 边界决策、token 预算下的上下文管理、带修复循环的结构化输出、工具设计、评估。
-
 ## 演示
 
 本地模式 —— 零 GitHub API 调用、零 token、零配置：
@@ -27,7 +25,7 @@
 ```
 $ repo-analyzer extract .
 Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
-  repo:        local/repo-analyzer-skill (main @ 6a3f1ad931)
+  repo:        local/repo-analyzer-skill (main @ 112d59bb60)
   languages:   Python, JSON, Markdown, TOML
   files:       95 (tree truncated: False)
   manifests:   1
@@ -41,7 +39,7 @@ LLM 推理层产出（真实报告，`examples/reports/pallets-flask/report.md`�
 
 > **Summary:** Flask 是一个轻量级 WSGI Web 应用框架，构建于 Werkzeug（WSGI/路由）与 Jinja2（模板）之上，是开发者 import 来构建 Web 应用的核心库包（version 3.2.0.dev）。
 >
-> **Purpose:** 开发者通过创建 Flask app 对象、注册路由/视图函数、使用蓝图组织模块、处理请求/响应、渲染模板和静态文件来构建 Web 应用。
+> **Purpose:** 开发者通过创建 Flask app 对象、注册路由/视图函数、使用蓝图组织模块、处理请求/响应、渲染模板和静态文件来构建 Web 应用。它同时作为库 API 和 CLI 工具（'flask' 命令）用于运行开发服务器。
 > Evidence: `README.md` `pyproject.toml` `src/flask/app.py` `src/flask/cli.py`
 
 | Category | Technology | Role |
