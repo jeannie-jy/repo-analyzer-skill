@@ -18,6 +18,15 @@
 - **可考证** —— LLM 绝不猜测脚本能确定的事实（语言占比、依赖版本、文件数）。每条断言必须引用真实存在的文件路径。
 - **可审计** —— 13 节报告 + 自动化证据校验（`verify-evidence`）+ 六指标评估框架（`eval`）。验证不了的断言进 `unknowns`，绝不进报告。
 
+## 安装
+
+```bash
+git clone https://github.com/<you>/repo-analyzer-skill
+cd repo-analyzer-skill
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"                              # 零运行时依赖；pytest 仅用于开发
+```
+
 ## 演示
 
 两个真实输出，各对应一种输入模式 —— 每个都给出可复现的命令。
@@ -144,15 +153,6 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 数字的含义：结构提取完全准确；入口 F1 跟随仓库形态（gum 的单入口 CLI 是最好情形；click 的纯库布局没有可确定性检测的入口——LLM 阶段会点名导入面，记录在 case README）；最硬的保证——0% 幻觉——在 flask 报告上成立；judge 给报告打 4/5 分，下一杠杆是收紧直接证据规则。
 
 ## 使用
-
-### 安装
-
-```bash
-git clone https://github.com/<you>/repo-analyzer-skill
-cd repo-analyzer-skill
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"                              # 零运行时依赖；pytest 仅用于开发
-```
 
 ### 配置
 

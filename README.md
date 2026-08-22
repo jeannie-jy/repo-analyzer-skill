@@ -19,6 +19,15 @@ This project exists to make codebase understanding **fast, grounded, and auditab
 - **Auditable** — a 13-section report plus an automated evidence check (`verify-evidence`) and a six-metric evaluation harness (`eval`). If a claim cannot be verified, it goes in `unknowns` — never in the report.
 
 
+## Install
+
+```bash
+git clone https://github.com/<you>/repo-analyzer-skill
+cd repo-analyzer-skill
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"                              # zero runtime deps; pytest for dev
+```
+
 ## Demo
 
 Two real outputs, one per input mode — each with the command that reproduces it.
@@ -145,15 +154,6 @@ Six metrics against hand-annotated gold cases (`repo-analyzer eval`, see [evals/
 What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape (gum's single-entry CLI is the best case; click's library-only layout has no deterministically detectable entry — the LLM phase names the import surface, recorded in the case README); the hardest guarantee, 0% hallucination, holds on the flask report; the judge rates the report useful (4/5) with direct-evidence tightening as the next lever.
 
 ## Usage
-
-### Install
-
-```bash
-git clone https://github.com/<you>/repo-analyzer-skill
-cd repo-analyzer-skill
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"                              # zero runtime deps; pytest for dev
-```
 
 ### Configure
 
