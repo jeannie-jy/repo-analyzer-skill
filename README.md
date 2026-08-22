@@ -21,22 +21,38 @@ This project exists to make codebase understanding **fast, grounded, and auditab
 
 ## Demo
 
-Local mode — zero GitHub API calls, zero tokens, zero setup:
+Two real outputs, one per input mode — each with the command that reproduces it.
 
-```
-$ repo-analyzer extract .
-Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
-  repo:        local/repo-analyzer-skill (main @ 112d59bb60)
-  languages:   Python, JSON, Markdown, TOML
-  files:       95 (tree truncated: False)
-  manifests:   1
-  entrypoints: 1 candidates
-  deps:        0 direct
-  warnings:    1
-    - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+### Demo 1: Local mode (zero GitHub API, zero tokens, zero setup)
+
+Reproduce from the repo root:
+
+```bash
+repo-analyzer extract .
 ```
 
-What the LLM reasoning layer produces (real report, `examples/reports/pallets-flask/report.md`, deepseek-v4-flash, 23/23 citations verified):
+Output (matches line for line; the HEAD hash moves as commits land):
+
+    Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
+      repo:        local/repo-analyzer-skill (main @ 112d59bb60)
+      languages:   Python, JSON, Markdown, TOML
+      files:       95 (tree truncated: False)
+      manifests:   1
+      entrypoints: 1 candidates
+      deps:        0 direct
+      warnings:    1
+        - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+
+### Demo 2: URL mode (full GitHub API pipeline)
+
+Reproduce (deterministic facts need no LLM key; the full report does):
+
+```bash
+repo-analyzer extract https://github.com/pallets/flask
+repo-analyzer analyze https://github.com/pallets/flask
+```
+
+Excerpt from a real `analyze` run (pallets/flask @ main `d318b68347`, deepseek-v4-flash, 23/23 citations verified; full report in `examples/reports/pallets-flask/report.md`):
 
 > **Summary:** Flask is a lightweight WSGI web application framework for Python, built on top of Werkzeug for WSGI/routing and Jinja2 for templating. It is the core library package (version 3.2.0.dev) that developers import to build web apps.
 >

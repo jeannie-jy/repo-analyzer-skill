@@ -20,22 +20,38 @@
 
 ## 演示
 
-本地模式 —— 零 GitHub API 调用、零 token、零配置：
+两个真实输出，各对应一种输入模式 —— 每个都给出可复现的命令。
 
-```
-$ repo-analyzer extract .
-Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
-  repo:        local/repo-analyzer-skill (main @ 112d59bb60)
-  languages:   Python, JSON, Markdown, TOML
-  files:       95 (tree truncated: False)
-  manifests:   1
-  entrypoints: 1 candidates
-  deps:        0 direct
-  warnings:    1
-    - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+### Demo 1: 本地模式（零 GitHub API、零 token、零配置）
+
+在仓库根目录运行即可复现：
+
+```bash
+repo-analyzer extract .
 ```
 
-LLM 推理层产出（真实报告，`examples/reports/pallets-flask/report.md`，deepseek-v4-flash，23/23 条引用全部验证通过）：
+相应产出（逐行一致；HEAD hash 会随提交前进而变化）：
+
+    Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
+      repo:        local/repo-analyzer-skill (main @ 112d59bb60)
+      languages:   Python, JSON, Markdown, TOML
+      files:       95 (tree truncated: False)
+      manifests:   1
+      entrypoints: 1 candidates
+      deps:        0 direct
+      warnings:    1
+        - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+
+### Demo 2: URL 模式（完整 GitHub API 管线）
+
+复现命令（确定性部分不需要 LLM key；完整报告需要）：
+
+```bash
+repo-analyzer extract https://github.com/pallets/flask
+repo-analyzer analyze https://github.com/pallets/flask
+```
+
+以下摘录来自一次真实 `analyze` 运行（pallets/flask @ main `d318b68347`，deepseek-v4-flash，23/23 条引用全部验证通过；完整报告见 `examples/reports/pallets-flask/report.md`）：
 
 > **Summary:** Flask 是一个轻量级 WSGI Web 应用框架，构建于 Werkzeug（WSGI/路由）与 Jinja2（模板）之上，是开发者 import 来构建 Web 应用的核心库包（version 3.2.0.dev）。
 >
