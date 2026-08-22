@@ -8,7 +8,7 @@ Given a repository URL, it:
 2. **Feeds facts + budgeted code samples to an LLM** for architecture reasoning (module relationships, execution flow, risks, contribution opportunities).
 3. **Emits a schema-validated report** in which every claim carries a verifiable file-path citation.
 
-Designed as an Agent Skill: `SKILL.md` drives an agent through the workflow, while the same pipeline is exposed as a CLI (`repo-analyzer`) for reproducibility, testing, and evaluation.
+Designed as an Agent Skill: [SKILL.md](SKILL.md) drives an agent through the workflow, while the same pipeline is exposed as a CLI (`repo-analyzer`) for reproducibility, testing, and evaluation.
 
 ## Status
 
@@ -16,12 +16,12 @@ Designed as an Agent Skill: `SKILL.md` drives an agent through the workflow, whi
 |---|---|---|
 | 1 | Architecture design | ✅ done ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |
 | 2 | Project skeleton | ✅ done |
-| 3 | Deterministic extraction layer | ⏳ next |
-| 4 | LLM reasoning pipeline | ⏳ |
-| 5 | Structured output + evidence check | ⏳ |
-| 6 | First real repository end-to-end | ⏳ |
-| 7 | Tests | ⏳ |
-| 8 | Evaluation baseline | ⏳ |
+| 3 | Deterministic extraction layer | ✅ done |
+| 4 | LLM reasoning pipeline | ✅ done |
+| 5 | Structured output + evidence check | ✅ done |
+| 6 | First real repository end-to-end | ✅ done ([examples/reports/pallets-flask](examples/reports/pallets-flask/)) |
+| 7 | Tests | ✅ done (170 tests) |
+| 8 | Evaluation baseline | ✅ done ([evals/results/baseline.md](evals/results/baseline.md)) |
 
 ## Installation
 
@@ -60,7 +60,17 @@ repo-analyzer extract https://github.com/pallets/flask
 repo-analyzer sample-code https://github.com/pallets/flask --budget 40000
 repo-analyzer validate-report output/repos/pallets/flask/report.json
 repo-analyzer verify-evidence output/repos/pallets/flask/report.json
+repo-analyzer eval --judge            # score reports against gold cases
 ```
+
+## Using as an Agent Skill
+
+Copy the repo (or symlink `SKILL.md` + `skill/`) into your agent's skills
+directory. The skill resolves the input, extracts facts, samples code under
+budget, reasons in four prompt sections, validates against the schema, and
+verifies every citation mechanically — see [SKILL.md](SKILL.md) for the
+full workflow. The `repo-analyzer` CLI is installed as a console script
+(`pip install -e .`) and serves as the deterministic backbone.
 
 ## Design
 
