@@ -221,3 +221,4 @@ __marimo__/
 # repo-analyzer artifacts (output-real/ is scratch from local runs)
 output/
 output-real/
+output-old/

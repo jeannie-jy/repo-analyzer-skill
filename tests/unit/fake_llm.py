@@ -20,6 +20,7 @@ class FakeLLM:
         settings: Settings | None = None,
     ) -> None:
         self.responses = list(responses)
+        self._last: str | Exception = responses[0] if responses else ""
         self.settings = settings or Settings(llm_model="fake-model")
         self.calls: list[list[dict[str, str]]] = []
 
@@ -31,7 +32,8 @@ class FakeLLM:
         max_tokens: int = 4096,
     ) -> str:
         self.calls.append(messages)
-        next_response = self.responses.pop(0) if self.responses else self.responses[-1]
-        if isinstance(next_response, Exception):
-            raise next_response
-        return next_response
+        if self.responses:
+            self._last = self.responses.pop(0)
+        if isinstance(self._last, Exception):
+            raise self._last
+        return self._last

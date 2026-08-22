@@ -44,6 +44,13 @@ from .facts import extract_facts
 # wrong types); two keeps worst-case latency and cost bounded.
 MAX_REPAIR_ATTEMPTS = 1
 
+# Reasoning providers sometimes truncate or corrupt large JSON replies
+# (chain of thought eats the output budget; occasionally the reply is
+# malformed even at finish_reason=stop). Retrying the identical call is
+# cheap (provider-side prompt caching) and usually succeeds. Network and
+# auth errors are NOT retried here — the client already retries those.
+MAX_PARSE_RETRIES = 2
+
 
 @dataclass(frozen=True)
 class AnalysisOutput:
@@ -86,16 +93,14 @@ def analyze(
 
     sample = sample_code(client, ref, branch, facts, budget=budget)
     messages = build_analysis_messages(facts, sample, prompt_dir=prompt_dir)
-    response = llm.complete(messages)
-    parsed = _parse_json_response(response)
+    response, parsed = _complete_parsed(llm, messages)
 
     for _ in range(MAX_REPAIR_ATTEMPTS):
         result = validate_analysis(parsed)
         if result.valid:
             break
         repair = _repair_messages(messages, response, result.errors)
-        response = llm.complete(repair)
-        parsed = _parse_json_response(response)
+        response, parsed = _complete_parsed(llm, repair)
     assert_valid(parsed)  # ReportValidationError if repair also failed
 
     evidence = verify_evidence(parsed, facts.tree)
@@ -162,6 +167,26 @@ def _repair_messages(
             ),
         },
     ]
+
+
+def _complete_parsed(
+    llm: LLMClient, messages: list[LLMMessage]
+) -> tuple[str, dict]:
+    """complete() + parse, retrying malformed replies.
+
+    The same messages are re-sent on parse failure (provider-side prompt
+    caching keeps the retry cheap). Exceptions from ``complete()`` itself
+    — network, auth, empty content — propagate untouched.
+    """
+    last_error: LLMError | None = None
+    for _ in range(MAX_PARSE_RETRIES + 1):
+        response = llm.complete(messages)
+        try:
+            return response, _parse_json_response(response)
+        except LLMError as exc:
+            last_error = exc
+    assert last_error is not None  # the loop always runs at least once
+    raise last_error
 
 
 def _parse_json_response(response: str) -> dict:

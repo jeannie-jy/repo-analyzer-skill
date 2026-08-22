@@ -162,6 +162,51 @@ def test_analyze_rejects_non_json(tmp_path) -> None:
         _run_analyze(tmp_path, "I cannot analyze this repository.")
 
 
+def test_analyze_retries_malformed_json_then_succeeds(tmp_path) -> None:
+    # provider truncates the reply twice, then answers cleanly: the
+    # identical call is retried instead of failing the pipeline
+    truncated = '{"overview": {"summary": "cut off mid-'
+    result, llm = _run_analyze_repair(
+        tmp_path, [truncated, truncated, json.dumps(VALID_ANALYSIS)]
+    )
+    assert result.analysis == VALID_ANALYSIS
+    assert len(llm.calls) == 3
+    # every retry re-sent the same two-message prompt
+    assert [m["role"] for m in llm.calls[1]] == ["system", "user"]
+
+
+def test_analyze_gives_up_after_parse_retries(tmp_path) -> None:
+    garbage = "not json at all"
+    llm = FakeLLM([garbage, garbage, garbage])
+    with pytest.raises(LLMError, match="no JSON"):
+        analyze(
+            _client_with_app(),
+            llm,
+            REF,
+            output_dir=tmp_path,
+            budget=40_000,
+            fetch_raw_fn=_noop_raw,
+        )
+    assert len(llm.calls) == 3
+
+
+def test_analyze_retries_repair_round_too(tmp_path) -> None:
+    # the repair call can be truncated as well — same bounded retry
+    broken = {k: v for k, v in VALID_ANALYSIS.items() if k != "risks"}
+    truncated_repair = '{"risks": [{"category": "complexity", "de'
+    llm = FakeLLM([json.dumps(broken), truncated_repair, json.dumps(VALID_ANALYSIS)])
+    result = analyze(
+        _client_with_app(),
+        llm,
+        REF,
+        output_dir=tmp_path,
+        budget=40_000,
+        fetch_raw_fn=_noop_raw,
+    )
+    assert result.analysis == VALID_ANALYSIS
+    assert len(llm.calls) == 3
+
+
 def test_analyze_repairs_schema_violations(tmp_path) -> None:
     broken = {k: v for k, v in VALID_ANALYSIS.items() if k != "risks"}
     result, llm = _run_analyze_repair(tmp_path, [json.dumps(broken), json.dumps(VALID_ANALYSIS)])
