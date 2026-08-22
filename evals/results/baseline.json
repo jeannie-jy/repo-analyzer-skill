@@ -1,0 +1,106 @@
+[
+  {
+    "case": "charmbracelet-gum",
+    "repo": {
+      "url": "https://github.com/charmbracelet/gum",
+      "ref": "main"
+    },
+    "structure": {
+      "expected": 8,
+      "hits": 8,
+      "misses": 0,
+      "accuracy": 1.0,
+      "missing_paths": []
+    },
+    "entrypoints": {
+      "gold_count": 2,
+      "predicted_count": 2,
+      "true_positives": [
+        "Dockerfile",
+        "main.go"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_negatives": [],
+      "false_positives": []
+    },
+    "grounding": null,
+    "judge": null
+  },
+  {
+    "case": "pallets-click",
+    "repo": {
+      "url": "https://github.com/pallets/click",
+      "ref": "main"
+    },
+    "structure": {
+      "expected": 10,
+      "hits": 10,
+      "misses": 0,
+      "accuracy": 1.0,
+      "missing_paths": []
+    },
+    "entrypoints": {
+      "gold_count": 1,
+      "predicted_count": 0,
+      "true_positives": [],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "false_negatives": [
+        "src/click/__init__.py"
+      ],
+      "false_positives": []
+    },
+    "grounding": null,
+    "judge": null
+  },
+  {
+    "case": "pallets-flask",
+    "repo": {
+      "url": "https://github.com/pallets/flask",
+      "ref": "main"
+    },
+    "structure": {
+      "expected": 10,
+      "hits": 10,
+      "misses": 0,
+      "accuracy": 1.0,
+      "missing_paths": []
+    },
+    "entrypoints": {
+      "gold_count": 3,
+      "predicted_count": 6,
+      "true_positives": [
+        "pyproject.toml",
+        "src/flask/__main__.py",
+        "src/flask/app.py"
+      ],
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.6666666666666666,
+      "false_negatives": [],
+      "false_positives": [
+        "src/flask/sansio/app.py",
+        "tests/test_apps/cliapp/app.py",
+        "tests/test_apps/helloworld/wsgi.py"
+      ]
+    },
+    "grounding": {
+      "total_citations": 23,
+      "verified": 23,
+      "unverified": 0,
+      "hallucination_rate": 0.0,
+      "unverified_list": []
+    },
+    "judge": {
+      "coverage": 5,
+      "grounding": 4,
+      "correctness": 4,
+      "actionability": 5,
+      "usefulness": 5,
+      "comments": "The report is comprehensive, covering purpose, architecture, entry points, risks, and contribution opportunities with specific file citations. The execution flow and data-flow descriptions are accurate for Flask's design. However, the risk statement about 'davidism accounts for 1,855 commits in a 30-day window of 16 commits' is nonsensical and unsupported; likely a misread of the data. Otherwise, claims are well-grounded (23/23 citations verified) and actionable, with clear reading order and con"
+    }
+  }
+]

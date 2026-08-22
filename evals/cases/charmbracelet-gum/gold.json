@@ -1,0 +1,17 @@
+{
+  "entrypoints": [
+    {"path": "main.go", "kind": "entrypoint_script", "note": "Go main package - the actual program entry"},
+    {"path": "Dockerfile", "kind": "container_entry", "note": "Containerized deployment entry"}
+  ],
+  "expected_paths": [
+    "main.go",
+    "gum.go",
+    "go.mod",
+    "Dockerfile",
+    "README.md",
+    "internal",
+    "examples",
+    "man"
+  ],
+  "note": "Small single-entry Go CLI: the heuristics should hit both gold entries (best-case shape)."
+}

@@ -192,4 +192,5 @@ def test_parser_exposes_all_subcommands() -> None:
         "sample-code",
         "validate-report",
         "verify-evidence",
+        "eval",
     }

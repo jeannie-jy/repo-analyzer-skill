@@ -1,0 +1,18 @@
+{
+  "entrypoints": [
+    {"path": "src/click/__init__.py", "kind": "library_api", "note": "Pure library: the import surface is the entry. Heuristics have no rule for library-only repos - expected false negative, documented in the baseline."}
+  ],
+  "expected_paths": [
+    "src/click/__init__.py",
+    "src/click/core.py",
+    "src/click/decorators.py",
+    "src/click/parser.py",
+    "src/click/types.py",
+    "pyproject.toml",
+    "README.md",
+    "tests",
+    "docs",
+    "examples"
+  ],
+  "note": "Library-only case: entrypoint heuristics cannot detect import surfaces, so recall is expected to be 0 - the LLM phase is the only layer that can name the entry."
+}

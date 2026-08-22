@@ -1,0 +1,20 @@
+{
+  "entrypoints": [
+    {"path": "pyproject.toml", "kind": "cli", "note": "[project.scripts] flask = flask.cli:main"},
+    {"path": "src/flask/__main__.py", "kind": "library_entry", "note": "python -m flask"},
+    {"path": "src/flask/app.py", "kind": "http_server", "note": "Flask class, WSGI entry point"}
+  ],
+  "expected_paths": [
+    "src/flask/app.py",
+    "src/flask/cli.py",
+    "src/flask/ctx.py",
+    "src/flask/globals.py",
+    "src/flask/sansio/app.py",
+    "pyproject.toml",
+    "README.md",
+    "tests",
+    "docs",
+    "examples"
+  ],
+  "note": "False positives expected from the greedy heuristics (sansio/app.py, tests apps) - the LLM phase re-ranks and drops them."
+}
