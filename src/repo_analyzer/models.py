@@ -8,6 +8,7 @@ built exclusively from ``RepoFacts``.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -75,9 +76,17 @@ class RepoRef:
         return cls(owner="local", repo=local.name, url=str(local), ref=None, local_path=local)
 
     def workdir(self, base: str | Path) -> Path:
-        """Artifact directory for this repo under a base output dir."""
+        """Artifact directory for this repo under a base output dir.
+
+        Local refs get a short hash of their resolved path so two
+        same-named directories from different parents don't overwrite
+        each other's artifacts.
+        """
         safe_owner = self.owner.lower().replace("_", "-")
         safe_repo = self.repo.lower().replace("_", "-")
+        if self.local_path is not None:
+            digest = hashlib.sha1(str(self.local_path).encode("utf-8")).hexdigest()[:8]
+            safe_repo = f"{safe_repo}-{digest}"
         return Path(base) / "repos" / safe_owner / safe_repo
 
 

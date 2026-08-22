@@ -18,6 +18,7 @@ from typing import Any
 
 from ..github_client import GitHubClient
 from ..models import FileSize, FileStats, RepoRef, RepoTree
+from .local import read_text_local
 from .tree import VENDORED_PREFIXES, is_binary_or_lockfile
 
 MAX_LARGEST_FILES = 15
@@ -37,7 +38,7 @@ def extract_file_stats(
     Vendored prefixes are excluded from the statistics (the raw tree in
     the fact base still contains everything).
     """
-    fetch_raw = fetch_raw_fn or _fetch_raw
+    fetch_raw = fetch_raw_fn or (_local_fetch_raw if ref.local_path is not None else _fetch_raw)
 
     blobs = [
         e
@@ -86,3 +87,16 @@ def _fetch_raw(ref: RepoRef, branch: str, path: str) -> str:
     )
     with urllib.request.urlopen(url, timeout=30) as resp:
         return resp.read().decode("utf-8", errors="replace")
+
+
+def _local_fetch_raw(ref: RepoRef, branch: str, path: str) -> str:
+    """Local counterpart of ``_fetch_raw``: read from the snapshot dir.
+
+    Raises ``FileNotFoundError`` on missing files for parity with the
+    remote variant (callers catch ``Exception`` and record the miss as
+    "no line count", never a crash).
+    """
+    content = read_text_local(ref.local_path, path)  # type: ignore[arg-type]
+    if content is None:
+        raise FileNotFoundError(path)
+    return content

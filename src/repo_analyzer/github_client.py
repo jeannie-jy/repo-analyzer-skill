@@ -200,7 +200,17 @@ def fetch_file_content(client: GitHubClient, ref: RepoRef, branch: str, path: st
     Returns ``None`` when the file is missing, too large for the API, or
     not decodable — callers treat ``None`` as "no information", never as
     an error.
+
+    Local refs read the file from the snapshot directory instead (same
+    None-on-missing/oversize semantics), so every consumer —
+    dependencies, entrypoints, code sampling — works unchanged.
     """
+    if ref.local_path is not None:
+        # Local import: ``extract.local`` -> ``extract.tree`` -> this
+        # module, so a top-level import here would be circular.
+        from .extract.local import read_text_local  # noqa: PLC0415
+
+        return read_text_local(ref.local_path, path)
     quoted = urllib.parse.quote(path, safe="/")
     try:
         data = client.get_json(

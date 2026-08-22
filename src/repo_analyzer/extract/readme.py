@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import base64
 import re
+from pathlib import Path
 
 from ..github_client import GitHubClient
 from ..errors import RepoNotFoundError
 from ..models import ReadmeInfo, RepoRef
+from .local import git_snapshot, read_text_local, walk_snapshot
 
 EXCERPT_CHARS = 2000
 
@@ -26,7 +28,15 @@ _COMMAND_PREFIX_RE = re.compile(
 
 
 def extract_readme(client: GitHubClient, ref: RepoRef, branch: str) -> ReadmeInfo:
-    """Fetch the repository README (404 = no README, not an error)."""
+    """Fetch the repository README (404 = no README, not an error).
+
+    Local refs scan the snapshot for a README (git mode: tracked files
+    only; walk mode: filesystem), matching case-insensitively so
+    ``readme.markdown`` / ``README.RST`` are found regardless of OS.
+    """
+    if ref.local_path is not None:
+        return _local_readme(ref.local_path)
+
     try:
         data = client.get_json(
             f"repos/{ref.api_path}/readme", params={"ref": branch}
@@ -41,6 +51,35 @@ def extract_readme(client: GitHubClient, ref: RepoRef, branch: str) -> ReadmeInf
         return ReadmeInfo(path=data.get("path"))
     return ReadmeInfo(
         path=data.get("path"),
+        excerpt=content[:EXCERPT_CHARS],
+        quickstart_commands=_extract_quickstart(content),
+    )
+
+
+def _local_readme(root: Path) -> ReadmeInfo:
+    """README from a local snapshot; README.md wins ties, root preferred."""
+    candidates = []
+    tracked = git_snapshot(root)
+    if tracked is not None:
+        entries = tracked
+    else:
+        entries = walk_snapshot(root)
+    for entry in entries:
+        if entry.type != "blob":
+            continue
+        name = entry.path.rsplit("/", 1)[-1].lower()
+        if name.startswith("readme"):
+            depth = entry.path.count("/")
+            is_preferred = name == "readme.md"
+            candidates.append((depth, not is_preferred, entry.path))
+    if not candidates:
+        return ReadmeInfo()
+    path = min(candidates)[2]
+    content = read_text_local(root, path)
+    if content is None:
+        return ReadmeInfo(path=path)
+    return ReadmeInfo(
+        path=path,
         excerpt=content[:EXCERPT_CHARS],
         quickstart_commands=_extract_quickstart(content),
     )

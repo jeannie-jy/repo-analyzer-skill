@@ -41,6 +41,24 @@ from .pipeline.facts import extract_facts
 from .report.schema import validate_analysis
 
 
+def _resolve_ref(value: str, *, ref: str | None = None) -> RepoRef:
+    """Accept a GitHub URL or an existing local directory.
+
+    Falls back to :meth:`RepoRef.from_local_path` only when the value
+    looks like a real directory — garbage input keeps the URL error
+    instead of a misleading "path does not exist". ``--ref`` selects a
+    branch/tag/sha and applies to GitHub URLs only.
+    """
+    try:
+        return RepoRef.from_url(value, ref=ref)
+    except InputError as exc:
+        if not Path(value).is_dir():
+            raise
+        if ref is not None:
+            raise InputError("--ref applies to GitHub URLs only, not local paths")
+        return RepoRef.from_local_path(value)
+
+
 def _add_command(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     name: str,
@@ -133,14 +151,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_extract(args: argparse.Namespace, settings: Settings) -> int:
-    ref = RepoRef.from_url(args.url, ref=args.ref)
+    ref = _resolve_ref(args.url, ref=args.ref)
     output_dir = args.output_dir or settings.output_dir
     client = GitHubClient(settings)
     facts = extract_facts(client, ref, output_dir=output_dir)
     path = ref.workdir(output_dir) / FACTS_FILENAME
     langs = ", ".join(l.name for l in facts.languages.languages[:5]) or "n/a"
     print(f"Extracted facts: {path}")
-    print(f"  repo:        {ref.api_path} ({facts.repo.get('branch')} @ {facts.repo.get('ref_sha', '?')[:10]})")
+    print(f"  repo:        {ref.api_path} ({facts.repo.get('branch')} @ {(facts.repo.get('ref_sha') or '?')[:10]})")
     print(f"  languages:   {langs}")
     print(f"  files:       {facts.files.total_files} (tree truncated: {facts.tree.truncated})")
     print(f"  manifests:   {len(facts.manifests)}")
@@ -156,7 +174,7 @@ def _cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
     settings.require_llm()  # ConfigError -> exit 2, fail fast before any API call
     if args.budget:
         settings = replace(settings, token_budget=args.budget)
-    ref = RepoRef.from_url(args.url, ref=args.ref)
+    ref = _resolve_ref(args.url, ref=args.ref)
     output_dir = args.output_dir or settings.output_dir
     client = GitHubClient(settings)
     llm = OpenAICompatClient(settings)
@@ -189,7 +207,7 @@ def _cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
 
 
 def _cmd_sample_code(args: argparse.Namespace, settings: Settings) -> int:
-    ref = RepoRef.from_url(args.url, ref=args.ref)
+    ref = _resolve_ref(args.url, ref=args.ref)
     output_dir = args.output_dir or settings.output_dir
     budget = args.budget or settings.token_budget
     client = GitHubClient(settings)

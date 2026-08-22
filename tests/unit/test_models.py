@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -71,4 +72,13 @@ def test_workdir_normalizes_case_and_underscores(tmp_path) -> None:
 def test_workdir_for_local_ref(tmp_path) -> None:
     ref = RepoRef.from_local_path(str(tmp_path))
     safe_name = tmp_path.name.lower().replace("_", "-")  # same normalization
-    assert ref.workdir("out") == Path("out") / "repos" / "local" / safe_name
+    # local refs carry a path hash so same-named dirs don't collide
+    assert ref.workdir("out") == Path("out") / "repos" / "local" / f"{safe_name}-{hashlib.sha1(str(tmp_path.resolve()).encode('utf-8')).hexdigest()[:8]}"
+
+
+def test_workdir_for_local_refs_from_different_parents_differ(tmp_path) -> None:
+    (tmp_path / "proj").mkdir()
+    (tmp_path / "other" / "proj").mkdir(parents=True)
+    a = RepoRef.from_local_path(str(tmp_path / "proj"))
+    b = RepoRef.from_local_path(str(tmp_path / "other" / "proj"))
+    assert a.workdir("out") != b.workdir("out")

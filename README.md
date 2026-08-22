@@ -52,7 +52,13 @@ See [.env.example](.env.example) for the full list of options.
 
 ```bash
 repo-analyzer analyze https://github.com/pallets/flask
+repo-analyzer extract /path/to/local/repo   # local dir: no GitHub API, no token needed
 ```
+
+Local paths are analyzed from the on-disk snapshot (git-tracked content
+at HEAD, or a filesystem scan for non-git dirs) with zero network calls.
+Git stats come from local git; stars/issues are unknown and reported as
+such.
 
 Individual pipeline stages are exposed as subcommands (each doubles as a
 tool for agent-driven runs):

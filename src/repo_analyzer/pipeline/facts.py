@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .. import __version__
 from ..errors import ExtractionError, RepoAnalyzerError
+from ..extract.local import head_sha_local, is_git_repo
 from ..github_client import GitHubClient
 from ..models import (
     FACTS_FILENAME,
@@ -80,15 +81,22 @@ def extract_facts(
 
     # --- head sha (for reproducible artifact identity) ----------------------
     ref_sha: str | None = None
-    try:
-        head = client.get_json(
-            f"repos/{ref.api_path}/commits",
-            params={"per_page": 1, "sha": branch},
-        )
-        if head:
-            ref_sha = head[0].get("sha")
-    except RepoAnalyzerError as exc:
-        warnings.append(f"Could not resolve head sha for {branch}: {exc}")
+    if ref.local_path is not None:
+        ref_sha = head_sha_local(ref.local_path)
+        if ref_sha is None:
+            warnings.append(
+                "Could not resolve head sha for local path (not a git repository)"
+            )
+    else:
+        try:
+            head = client.get_json(
+                f"repos/{ref.api_path}/commits",
+                params={"per_page": 1, "sha": branch},
+            )
+            if head:
+                ref_sha = head[0].get("sha")
+        except RepoAnalyzerError as exc:
+            warnings.append(f"Could not resolve head sha for {branch}: {exc}")
 
     # --- independent facts ---------------------------------------------------
     tree: RepoTree = _EMPTY_TREE
@@ -141,6 +149,21 @@ def extract_facts(
         readme = readme_module.extract_readme(client, ref, branch)
     except RepoAnalyzerError as exc:
         warnings.append(f"README extraction failed: {exc}")
+
+    if ref.local_path is not None:
+        warnings.append(
+            "local mode: metadata is minimal (no stars/issues); "
+            "language shares are extension-based approximations"
+        )
+        if not is_git_repo(ref.local_path):
+            warnings.append(
+                "local mode: not a git repository - using a filesystem "
+                "snapshot (untracked files included)"
+            )
+        elif not tree.entries and any(ref.local_path.iterdir()):
+            warnings.append(
+                "local mode: no tracked files found (untracked-only repo?)"
+            )
 
     facts = RepoFacts(
         repo={

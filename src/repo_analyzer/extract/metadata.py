@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..github_client import GitHubClient
 from ..models import RepoMetadata, RepoRef
+from .local import default_branch_local
 
 
 def extract_metadata(client: GitHubClient, ref: RepoRef) -> RepoMetadata:
@@ -11,7 +12,14 @@ def extract_metadata(client: GitHubClient, ref: RepoRef) -> RepoMetadata:
 
     Every field is mapped defensively (``.get`` with defaults) so API
     shape drift degrades to a default value instead of a crash.
+
+    Local refs get only the branch name — stars, forks, issues, and the
+    rest are not determinable without the API, so they stay at honest
+    defaults (0/None) instead of being guessed.
     """
+    if ref.local_path is not None:
+        return RepoMetadata(default_branch=default_branch_local(ref.local_path))
+
     data = client.get_json(f"repos/{ref.api_path}")
     license_data = data.get("license") or {}
     return RepoMetadata(

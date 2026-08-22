@@ -20,64 +20,18 @@ from pathlib import Path
 
 from ..github_client import GitHubClient
 from ..models import RepoRef, RepoTree, TreeEntry
+from .local import SnapshotEntry, git_snapshot, walk_snapshot
 
 DEFAULT_MAX_ENTRIES = 20_000
 MAX_TOP_LEVEL_DIRS_TO_EXPAND = 30
 
-# Content that should never be fed to an LLM or counted as code:
-# binary formats (decoding them produces garbage text) and lockfiles
-# (generated, huge, zero architectural signal). Kept here so every
-# consumer filters consistently.
-BINARY_EXTENSIONS = frozenset(
-    {
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico",
-        ".woff", ".woff2", ".ttf", ".otf", ".eot",
-        ".pdf", ".zip", ".gz", ".tgz", ".bz2", ".xz", ".tar", ".7z",
-        ".exe", ".dll", ".so", ".dylib", ".pyc", ".class", ".jar", ".war",
-        ".o", ".a", ".bin", ".dat", ".db", ".sqlite", ".parquet",
-    }
-)
-LOCKFILE_NAMES = frozenset(
-    {
-        "package-lock.json", "npm-shrinkwrap.json", "yarn.lock",
-        "pnpm-lock.yaml", "uv.lock", "poetry.lock", "Pipfile.lock",
-        "Cargo.lock", "go.sum", "composer.lock", "Gemfile.lock", "mix.lock",
-    }
-)
-
-
-def is_binary_or_lockfile(path: str) -> bool:
-    """True for binary formats and lockfiles — never LLM- or LOC-material."""
-    if Path(path).name in LOCKFILE_NAMES:
-        return True
-    return Path(path).suffix.lower() in BINARY_EXTENSIONS
-
-
-# Paths we flag as vendored / generated. Kept as *prefixes* so consumers
-# can filter consistently (dependencies, file stats, sampling).
-VENDORED_PREFIXES = (
-    ".git",
-    ".github",
-    ".gitlab",
-    ".idea",
-    ".vscode",
-    ".venv",
-    ".next",
-    ".nuxt",
-    "__pycache__",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".tox",
-    ".ruff_cache",
-    "node_modules",
-    "vendor",
-    "venv",
-    "env",
-    "dist",
-    "build",
-    "target",
-    "coverage",
-    "htmlcov",
+# Re-exported from extract.ignore so existing consumers keep importing
+# from tree.py without change.
+from .ignore import (  # noqa: E402
+    BINARY_EXTENSIONS,
+    LOCKFILE_NAMES,
+    VENDORED_PREFIXES,
+    is_binary_or_lockfile,
 )
 
 
@@ -90,9 +44,14 @@ def extract_tree(
 ) -> RepoTree:
     """Build the repository tree for ``branch``.
 
-    Raises the typed GitHub errors (404 / rate limit / network); the
-    pipeline turns those into warnings for the fact base.
+    Local refs read the on-disk snapshot (git-tracked content at HEAD,
+    or a filesystem scan for non-git dirs) and never touch the network.
+    Raises the typed GitHub errors (404 / rate limit / network) for
+    remote refs; the pipeline turns those into warnings for the fact base.
     """
+    if ref.local_path is not None:
+        return _local_tree(ref.local_path, max_entries=max_entries)
+
     data = client.get_json(
         f"repos/{ref.api_path}/git/trees/{urllib.parse.quote(branch)}",
         params={"recursive": 1},
@@ -103,10 +62,46 @@ def extract_tree(
     if truncated:
         entries = _expand_two_levels(client, ref, branch)
 
+    return _assemble(entries, max_entries=max_entries, truncated=truncated)
+
+
+def _local_tree(root: Path, *, max_entries: int) -> RepoTree:
+    """Tree from a local directory: git snapshot, or walk fallback."""
+    entries = git_snapshot(root)
+    if entries is None:
+        entries = walk_snapshot(root)
+    return _assemble(_snapshot_to_entries(entries), max_entries=max_entries)
+
+
+def _snapshot_to_entries(snapshot: list[SnapshotEntry]) -> list[TreeEntry]:
+    """Snapshot items -> TreeEntry, deriving directory nodes from paths."""
+    entries: list[TreeEntry] = []
+    dir_paths: set[str] = set()
+    for item in snapshot:
+        parts = item.path.split("/")
+        for i in range(1, len(parts)):
+            dir_paths.add("/".join(parts[:i]))
+    entries.extend(
+        TreeEntry(path=path, type="tree") for path in sorted(dir_paths)
+    )
+    for item in snapshot:
+        if item.type == "tree":
+            # submodule directory nodes (also present in git_snapshot)
+            if item.path not in dir_paths:
+                entries.append(TreeEntry(path=item.path, type="tree", sha=item.sha))
+        else:
+            entries.append(
+                TreeEntry(path=item.path, type="blob", size=item.size, sha=item.sha)
+            )
+    return entries
+
+
+def _assemble(entries: list[TreeEntry], *, max_entries: int, truncated: bool = False) -> RepoTree:
+    """Shared tree assembly: sort, cap, derive top-level lists."""
+    entries = sorted(entries, key=lambda e: e.path)
     if len(entries) > max_entries:
         entries = entries[:max_entries]
         truncated = True
-
     return RepoTree(
         truncated=truncated,
         entries=entries,
