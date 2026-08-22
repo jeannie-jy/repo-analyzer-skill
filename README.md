@@ -195,16 +195,17 @@ Six metrics against hand-annotated gold cases (`repo-analyzer eval`, see [evals/
 | Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
 |---|---|---|---|---|---|---|
 | charmbracelet/gum | small Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | n/a | n/a | n/a |
-| pallets/flask | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/3/5, 4 |
+| pallets/flask | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
+| pallets/flask, pre-rule (A/B) | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
 | pallets/click | pure Python library | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
 
-What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape (gum's single-entry CLI is the best case; click's library-only layout has no deterministically detectable entry — the LLM phase names the import surface, recorded in the case README); the hardest guarantee, 0% hallucination, holds on the flask report; the judge rates the report useful (4/5) with direct-evidence tightening as the next lever.
+What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape (gum's single-entry CLI is the best case; click's library-only layout has no deterministically detectable entry — the LLM phase names the import surface, recorded in the case README); the hardest guarantee, 0% hallucination, holds on both flask reports. The 2026-08-23 row is the post-tightening re-measure: the "evidence must be DIRECT" rule (Roadmap item 1, done) tightened citations from 23 to 18 and removed the old report's commit-count contradiction, but judge medians stayed put (grounding 3.5 vs 3) — single-run judge variance (±2) exceeds the rule effect at N=4-6, and both reports share one structural deduction: digest-verified metrics (commit counts, file sizes) have no file path whose content proves them (see [baseline.md](evals/results/baseline.md)).
 
 ## Roadmap
 
 MVP (Phases 1-8) is complete. Next levers, in order of value:
 
-1. **Tighten evidence rules** — the judge scored grounding 3/5 for indirect citations; make "path must directly support the claim" a prompt-level rule and re-measure with `eval --judge`.
+1. ~~**Tighten evidence rules**~~ — **DONE (2026-08-23)**: "the cited file's content must itself show the claim" is now a prompt-level rule (CLI contract + all four skill prompts) and part of the judge rubric; re-measured via `eval --judge` A/B (citations 23→18, 0% hallucination held, judge medians unchanged — variance dominates). Next: resolve the digest-metric deduction (commit counts / file sizes have no file path that proves them).
 2. **Library blind spot** — click's entrypoint F1 is 0.0 because pure libraries have no deterministic entry; add an LLM-phase "import surface" candidate so the LLM can name it.
 3. **More gold cases** — Go monorepos, Node CLIs, Rust crates; each adds a row to the baseline and guards prompt regressions.
 4. **Report language coverage** — `REPORT_LANGUAGE` exists; verify and polish the zh rendering path end-to-end.

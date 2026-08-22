@@ -88,8 +88,8 @@
       ]
     },
     "grounding": {
-      "total_citations": 23,
-      "verified": 23,
+      "total_citations": 18,
+      "verified": 18,
       "unverified": 0,
       "hallucination_rate": 0.0,
       "unverified_list": []
@@ -98,9 +98,9 @@
       "coverage": 5,
       "grounding": 4,
       "correctness": 4,
-      "actionability": 5,
-      "usefulness": 5,
-      "comments": "The report is comprehensive, covering purpose, architecture, entry points, risks, and contribution opportunities with specific file citations. The execution flow and data-flow descriptions are accurate for Flask's design. However, the risk statement about 'davidism accounts for 1,855 commits in a 30-day window of 16 commits' is nonsensical and unsupported; likely a misread of the data. Otherwise, claims are well-grounded (23/23 citations verified) and actionable, with clear reading order and con"
+      "actionability": 4,
+      "usefulness": 4,
+      "comments": "Comprehensive report covering purpose, layered architecture (WSGI Flask -> sansio App -> Scaffold), entry points (CLI, __main__, test wsgi, app.py false positive), execution flow, risks, and contribution paths. Grounding is generally strong with 18 citations tied to specific files; however, the maintainer-concentration risk citing CHANGES.rst for commit counts is questionable (a changelog would not substantiate 'davidism 1855, mitsuhiko 1189 commits'), and line/byte counts are presented as fact "
     }
   }
 ]

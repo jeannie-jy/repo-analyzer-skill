@@ -194,16 +194,17 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 | Case | 类型 | Structure | Entrypoint P/R/F1 | Grounding | 幻觉 | Judge (c/g/c/a, useful) |
 |---|---|---|---|---|---|---|
 | charmbracelet/gum | 小型 Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | n/a | n/a | n/a |
-| pallets/flask | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/3/5, 4 |
+| pallets/flask | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
+| pallets/flask, 收紧前 (A/B) | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
 | pallets/click | 纯 Python 库 | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
 
-数字的含义：结构提取完全准确；入口 F1 跟随仓库形态（gum 的单入口 CLI 是最好情形；click 的纯库布局没有可确定性检测的入口——LLM 阶段会点名导入面，记录在 case README）；最硬的保证——0% 幻觉——在 flask 报告上成立；judge 给报告打 4/5 分，下一杠杆是收紧直接证据规则。
+数字的含义：结构提取完全准确；入口 F1 跟随仓库形态（gum 的单入口 CLI 是最好情形；click 的纯库布局没有可确定性检测的入口——LLM 阶段会点名导入面，记录在 case README）；最硬的保证——0% 幻觉——在两张 flask 报告上都成立。2026-08-23 行是收紧后的复测："证据必须直接"规则（Roadmap 第 1 项，已完成）把引用从 23 收紧到 18，并消除了旧报告的提交数矛盾，但 judge 中位数原地踏步（grounding 3.5 vs 3）——单次运行方差（±2）在 N=4-6 下超过规则效应，且两份报告共享同一个结构性扣分：digest 已验证的度量（提交数、文件大小）没有内容能自证的文件路径（详见 [baseline.md](evals/results/baseline.md)）。
 
 ## Roadmap
 
 MVP（Phase 1-8）已完成。下一批杠杆，按价值排序：
 
-1. **收紧证据规则** — judge 给间接引用打了 3/5（grounding）；把"路径必须直接支撑断言"提升为 prompt 级规则，用 `eval --judge` 复测。
+1. ~~**收紧证据规则**~~ — **已完成（2026-08-23）**："被引用文件的内容必须自行展示该断言"现在是 prompt 级规则（CLI 契约 + 全部四个 skill prompts），并纳入 judge rubric；已用 `eval --judge` A/B 复测（引用 23→18，0% 幻觉保持，judge 中位数未变——方差主导）。下一步：解决 digest 度量扣分（提交数/文件大小没有能自证的文件路径）。
 2. **库盲区** — click 的入口 F1 是 0.0，因为纯库没有确定性入口；加一个 LLM 阶段的"导入面"候选，让 LLM 点名它。
 3. **更多 gold cases** — Go monorepo、Node CLI、Rust crate；每个都往 baseline 加一行，防 prompt 回归。
 4. **报告语言覆盖** — `REPORT_LANGUAGE` 已存在；端到端验证并打磨中文渲染路径。

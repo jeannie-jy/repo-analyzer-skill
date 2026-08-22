@@ -27,6 +27,37 @@ judge metrics cost one LLM call per analyzed report.
 | pallets/flask | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/3/5, 4 |
 | pallets/click | pure Python library | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a (no report) | n/a | n/a |
 
+## Results (2026-08-23) — evidence directness re-measure
+
+Roadmap item 1 ("tighten evidence rules") landed: "the cited file's
+content must itself show the claim" is now a prompt-level rule in the
+CLI output contract and all four `skill/prompts/*.md` sections, and the
+judge rubric's grounding definition gained the same directness wording.
+The flask report was regenerated with the new prompts (same pinned
+ref, `d318b6834`); the pre-rule report was re-judged under the new
+rubric for an A/B. Judge scores are N-run medians (6 runs new, 4 runs
+old — single-run variance is real, see limitations).
+
+| Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
+|---|---|---|---|---|---|---|
+| pallets/flask, new rules | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
+| pallets/flask, old rules (A/B) | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
+
+The rule changed the report's content as designed: citations tightened
+from 23 to 18 (all still verified, 0% hallucination), and direct-path
+selection is visible in the output — e.g. the tech-stack row for the
+`flask` console command now cites `pyproject.toml` (the `[project].scripts`
+entry) and `src/flask/cli.py` (the `FlaskGroup` definition) where the
+pre-rule report cited related-but-unproving files. The old report's
+"1,855 commits in a 30-day window of 16 commits" contradiction is gone
+from the new report.
+
+The judge medians barely moved (grounding 3.5 vs 3, everything else
+overlapping): the effect is real but smaller than judge variance at
+N=4-6 (the old report scored grounding 5 in one run and 3 in three
+others; the new report scored grounding 2 in one run). Both reports
+share the one recurring deduction — see limitations.
+
 ## Reading the numbers
 
 1. **Structure extraction is exact (28/28 gold paths).** The tree is
@@ -44,22 +75,36 @@ judge metrics cost one LLM call per analyzed report.
    so recall is 0 and only the LLM can name the import surface. This is
    recorded in the case README rather than hidden.
 
-3. **Grounding is clean: 0% hallucination** on the flask report
-   (23/23 citations verified against the tree), which is the pipeline's
-   hardest guarantee.
+3. **Grounding is clean: 0% hallucination** on both flask reports
+   (23/23 and 18/18 citations verified against the tree), which is the
+   pipeline's hardest guarantee — and it survived the citation
+   tightening.
 
-4. **Judge scores the report useful (4/5) with strengths and
-   weaknesses**: coverage 5 and actionability 5 (the report is
-   comprehensive and contribution suggestions are concrete), but
-   grounding 3 / correctness 3 — the judge flagged that some claims'
-   evidence paths are indirect (cited files that imply, not prove, the
-   claim). That is the next lever: tighten the prompt's evidence rules
-   toward "path must directly support the claim", then re-judge.
+4. **The directness rule is measured, not assumed.** New vs old report
+   under the same (tightened) rubric: grounding median 3.5 vs 3. The
+   rule changed content (18 vs 23 citations, direct paths, the
+   contradiction removed) but did not move the judge beyond noise at
+   N=4-6 — variance dominates. What the judge *does* flag,
+   consistently, on both reports: claims restating digest-verified
+   metrics that no file's content can prove — commit counts (citing
+   `CHANGES.rst`) and file size/line counts (citing the file itself,
+   whose content does not state its own size). These are digest-facts
+   with no file path that demonstrates them; the schema requires at
+   least one evidence path, so the report cites the subject path and
+   the judge deducts. This is a design boundary, not a prompt fix —
+   candidates: let digest-sourced claims carry a `digest` marker the
+   judge accepts, or move such claims to `unknowns` at the cost of
+   coverage (they are verified, so losing them is a loss).
 
 ## Known limitations
 
-- Judge scores are single-run, single-model (deepseek-v4-flash); no
-  ensemble or cross-model check yet.
+- Judge scores are single-model (deepseek-v4-flash) with high run
+  variance: the same report scored grounding 3 and 5 across runs.
+  Medians over N=4-5 are reported, but the spread is wider than the
+  prompt effects measured so far.
 - Click/gum cases have no report yet; judge and grounding columns are
   n/a until `analyze` runs exist for them.
 - Gold annotations are the author's manual review, not crowd-verified.
+- The analyzer hardens against provider flakiness (parse retries,
+  `LLM_MAX_OUTPUT_TOKENS=32768`), but large reports still occasionally
+  need a retry, and the judge call itself can return outlier scores.
