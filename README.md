@@ -69,15 +69,15 @@ The agent then resolves the input, runs the deterministic CLI stages, reasons ov
 
 Two real outputs, one per input mode — each with the command that reproduces it.
 
-### Demo 1: Local mode (zero GitHub API, zero tokens, zero setup)
+### Demo 1: Local mode (zero GitHub API, zero tokens)
 
-Reproduce from the repo root:
+Reproduce from the repo root — the same pipeline as URL mode, only the input differs:
 
 ```bash
-repo-analyzer extract .
+repo-analyzer analyze .
 ```
 
-Output (matches line for line; the HEAD hash moves as commits land):
+Step 1 — deterministic facts (analyze runs this internally; no LLM key; the output matches line for line, the HEAD hash moves as commits land):
 
     Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
       repo:        local/repo-analyzer-skill (main @ 112d59bb60)
@@ -88,6 +88,16 @@ Output (matches line for line; the HEAD hash moves as commits land):
       deps:        0 direct
       warnings:    1
         - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+
+Step 2 — the full 13-section report (real output, `output/repos/local/repo-analyzer-skill-cef3623c/report.md`, deepseek-v4-flash, 31/32 citations verified — the 1 unverified citation is flagged, not hidden — 9 unknowns):
+
+> **Summary:** repo-analyzer-skill is an Agent Skill (also packaged as a CLI) that turns any GitHub repository or local clone into a structured, evidence-based analysis report covering architecture, module relationships, entry points, execution flow, risks and contribution opportunities, where every claim carries a file-path citation that is mechanically verified before the report ships.
+> Evidence: `README.md` `SKILL.md` `docs/ARCHITECTURE.md` `pyproject.toml`
+
+| Category | Technology | Role |
+|---|---|---|
+| language | Python | The entire runtime is Python, targeting >=3.11; language share is 52.5% of bytes (274,879 B). [`pyproject.toml`] |
+| tooling | Python stdlib (urllib, tomllib, dataclasses, argparse, json) | Deliberate zero-runtime-dependency stack: urllib for GitHub API, tomllib for TOML parsing, dataclasses for the fact/report contracts, argparse for the CLI. [`pyproject.toml`] [`src/repo_analyzer/extract/dependencies.py`] [`src/repo_analyzer/cli.py`] |
 
 ### Demo 2: URL mode (full GitHub API pipeline)
 

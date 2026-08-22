@@ -68,15 +68,15 @@ agent 随后自行解析输入、跑确定性 CLI 阶段、按四个 prompt sect
 
 两个真实输出，各对应一种输入模式 —— 每个都给出可复现的命令。
 
-### Demo 1: 本地模式（零 GitHub API、零 token、零配置）
+### Demo 1: 本地模式（零 GitHub API、零 token）
 
-在仓库根目录运行即可复现：
+在仓库根目录运行即可复现——与 URL 模式是同一套管线，只是输入换成本地路径：
 
 ```bash
-repo-analyzer extract .
+repo-analyzer analyze .
 ```
 
-相应产出（逐行一致；HEAD hash 会随提交前进而变化）：
+第一步——确定性事实提取（analyze 内部自动执行，无需 LLM key；输出逐行一致，HEAD hash 会随提交前进而变化）：
 
     Extracted facts: output\repos\local\repo-analyzer-skill-cef3623c\repo_facts.json
       repo:        local/repo-analyzer-skill (main @ 112d59bb60)
@@ -87,6 +87,16 @@ repo-analyzer extract .
       deps:        0 direct
       warnings:    1
         - local mode: metadata is minimal (no stars/issues); language shares are extension-based approximations
+
+第二步——完整 13 节报告（真实产出，`output/repos/local/repo-analyzer-skill-cef3623c/report.md`，deepseek-v4-flash，31/32 条引用验证通过——未通过的那 1 条被明确标记而非掩盖——9 个 unknowns）：
+
+> **Summary:** repo-analyzer-skill 是一个 Agent Skill（同时打包为 CLI），把任意 GitHub 仓库或本地克隆转化为结构化、基于证据的分析报告，覆盖架构、模块关系、入口、执行流、风险与贡献机会，每条断言都携带文件路径引用，发布前被机械校验。
+> Evidence: `README.md` `SKILL.md` `docs/ARCHITECTURE.md` `pyproject.toml`
+
+| Category | Technology | Role |
+|---|---|---|
+| language | Python | 整个运行时都是 Python，要求 >=3.11；语言占比 52.5%（274,879 字节）。[`pyproject.toml`] |
+| tooling | Python stdlib (urllib, tomllib, dataclasses, argparse, json) | 刻意选择的零运行时依赖栈：urllib 调 GitHub API、tomllib 解析 TOML、dataclasses 定义事实/报告契约、argparse 建 CLI。[`pyproject.toml`] [`src/repo_analyzer/extract/dependencies.py`] [`src/repo_analyzer/cli.py`] |
 
 ### Demo 2: URL 模式（完整 GitHub API 管线）
 
