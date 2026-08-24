@@ -1,6 +1,6 @@
 {
   "entrypoints": [
-    {"path": "src/click/__init__.py", "kind": "library_api", "note": "Pure library: the import surface is the entry. Heuristics have no rule for library-only repos - expected false negative, documented in the baseline."}
+    {"path": "src/click/__init__.py", "kind": "library_api", "note": "Pure library: the import surface is the entry. The deterministic library-package-root heuristic (since 2026-08-24) emits this candidate; the LLM phase confirms it and raises its confidence from the sampled __init__.py."}
   ],
   "expected_paths": [
     "src/click/__init__.py",
@@ -14,5 +14,5 @@
     "docs",
     "examples"
   ],
-  "note": "Library-only case: entrypoint heuristics cannot detect import surfaces, so recall is expected to be 0 - the LLM phase is the only layer that can name the entry."
+  "note": "Library-only case: the import surface is the only entry. The deterministic library-package-root heuristic detects it (kind library_api), so entrypoint F1 is measurable — measured 1.00 on 2026-08-24 (live main)."
 }

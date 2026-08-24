@@ -192,19 +192,19 @@ Six metrics against hand-annotated gold cases (`repo-analyzer eval`, see [evals/
 
 | Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
 |---|---|---|---|---|---|---|
-| charmbracelet/gum | small Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | n/a | n/a | n/a |
+| charmbracelet/gum | small Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 20/20 | **0%** | 5/3/4/5, 4 |
 | pallets/flask | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
 | pallets/flask, pre-rule (A/B) | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
-| pallets/click | pure Python library | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
+| pallets/click | pure Python library | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 19/19 | **0%** | 5/4/4/5, 5 |
 
-What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape (gum's single-entry CLI is the best case; click's library-only layout has no deterministically detectable entry — the LLM phase names the import surface, recorded in the case README); the hardest guarantee, 0% hallucination, holds on both flask reports. The 2026-08-23 row is the post-tightening re-measure: the "evidence must be DIRECT" rule (Roadmap item 1, done) tightened citations from 23 to 18 and removed the old report's commit-count contradiction, but judge medians stayed put (grounding 3.5 vs 3) — single-run judge variance (±2) exceeds the rule effect at N=4-6, and both reports share one structural deduction: digest-verified metrics (commit counts, file sizes) have no file path whose content proves them (see [baseline.md](evals/results/baseline.md)).
+What the numbers mean: structure extraction is exact; entry-point F1 tracks repository shape — gum's single-entry CLI is the best case, and click's library-only layout is now detected too: the deterministic package-root heuristic (Roadmap item 2, 2026-08-24) emits `src/click/__init__.py` as a `library_api` candidate when no runnable entry exists, and the LLM confirms it from the sampled `__init__.py`, raising the 0.40 confidence to 0.90 with an `import click` invocation; the hardest guarantee, 0% hallucination, now holds on **all three** reports (flask 18/18, click 19/19, gum 20/20). The 2026-08-23 rows are the post-tightening re-measure: the "evidence must be DIRECT" rule (Roadmap item 1, done) tightened citations from 23 to 18 and removed the old report's commit-count contradiction, but judge medians stayed put (grounding 3.5 vs 3) — single-run judge variance (±2) exceeds the rule effect at N=4-6, and both reports share one structural deduction: digest-verified metrics (commit counts, file sizes) have no file path whose content proves them (see [baseline.md](evals/results/baseline.md)).
 
 ## Roadmap
 
 MVP (Phases 1-8) is complete. Next levers, in order of value:
 
 1. ~~**Tighten evidence rules**~~ — **DONE (2026-08-23)**: "the cited file's content must itself show the claim" is now a prompt-level rule (CLI contract + all four skill prompts) and part of the judge rubric; re-measured via `eval --judge` A/B (citations 23→18, 0% hallucination held, judge medians unchanged — variance dominates). Next: resolve the digest-metric deduction (commit counts / file sizes have no file path that proves them).
-2. **Library blind spot** — click's entrypoint F1 is 0.0 because pure libraries have no deterministic entry; add an LLM-phase "import surface" candidate so the LLM can name it.
+2. ~~**Library blind spot**~~ — **DONE (2026-08-24)**: the deterministic package-root heuristic (`<pkg>/__init__.py` or `src/<pkg>/__init__.py`, ≥2 .py files, excluded dirs, suppressed only by cli/http_server candidates) emits the import surface as a `library_api` candidate; click's entrypoint F1 went 0.00 → 1.00 (P=1 R=1), flask/gum unchanged (regression guard), and the click report names `src/click/__init__.py` at confidence 0.90 with invocation `import click`. Next: resolve the digest-metric deduction (judge keeps deducting claims whose only evidence is a digest-verified number).
 3. **More gold cases** — Go monorepos, Node CLIs, Rust crates; each adds a row to the baseline and guards prompt regressions.
 4. **Report language coverage** — `REPORT_LANGUAGE` exists; verify and polish the zh rendering path end-to-end.
 5. **Evaluation depth** — multi-model judge ensemble and per-section scoring instead of whole-report.

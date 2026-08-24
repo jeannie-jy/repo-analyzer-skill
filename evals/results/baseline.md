@@ -58,6 +58,44 @@ N=4-6 (the old report scored grounding 5 in one run and 3 in three
 others; the new report scored grounding 2 in one run). Both reports
 share the one recurring deduction — see limitations.
 
+## Results (2026-08-24) — library blind spot closed
+
+Roadmap item 2 landed: a deterministic library-package-root heuristic in
+`extract/entrypoints.py` (step 6) emits the package root `__init__.py`
+as a `library_api` candidate when no `cli`/`http_server` candidate
+exists — for a pure library, the import surface IS the entry. Click's
+entrypoint F1 went from 0.00 to 1.00; gum and flask are unchanged
+(regression guard: the skip rule fires for flask's console scripts, and
+gum is Go with no `__init__.py`). Click and gum now have full reports,
+so their grounding and judge columns are filled. Judge scores are N=3
+medians; grounding is the mechanical `verify-evidence` count.
+
+| Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
+|---|---|---|---|---|---|---|
+| charmbracelet/gum | small Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 20/20 | **0%** | 5/3/4/5, 4 |
+| pallets/click | pure Python library | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 19/19 | **0%** | 5/4/4/5, 5 |
+
+(flask rows unchanged from 2026-08-23: 0.67 entrypoint F1 with the same
+three expected false positives, 18/18 grounding, judge 5/4/4/4, 4.)
+
+The click report's entry_points section names `src/click/__init__.py`
+as kind `library_api` with invocation `import click`; the LLM raised
+the deterministic 0.40 confidence to 0.90 after sampling showed a
+coherent public API (re-exports of Command/Group/Context/Parameter) —
+the prompt contract working as designed. Judge comments on both new
+reports recur on the documented digest-metric deduction (gum's GitHub
+statistics and contributor commit counts cited to `README.md`, which
+cannot contain them; click's version-specific claims that only a
+changelog proves) — consistent with flask's recurring deduction.
+
+Method note: this run's `baseline.json` was rebuilt from the fresh
+pinned-ref facts and reports on disk plus direct `judge_report` calls
+(the exact function `eval --judge` uses) — because `eval` re-extracts
+every case on every invocation, six full eval runs would exceed the
+tokenless GitHub budget (60 req/hr per IP). A `GITHUB_TOKEN` was
+configured on 2026-08-24, so `repo-analyzer eval --output-dir output
+--judge` now reproduces these numbers end to end.
+
 ## Reading the numbers
 
 1. **Structure extraction is exact (28/28 gold paths).** The tree is
@@ -69,11 +107,17 @@ share the one recurring deduction — see limitations.
    entries (R=1.0) at the cost of three expected false positives
    (`sansio/app.py` base class, two `tests/test_apps` apps). The LLM
    phase re-ranks and drops those — the eval case note says so. Gum is
-   the best-case shape (single-entry CLI) at F1=1.0. Click exposes a
-   real blind spot: **library-only repos have no detectable entry** by
-   deterministic rules (no console scripts, no `__main__`, no server),
-   so recall is 0 and only the LLM can name the import surface. This is
-   recorded in the case README rather than hidden.
+   the best-case shape (single-entry CLI) at F1=1.0. Click's library
+   blind spot (F1 was 0.00 — no console scripts, no `__main__`, no
+   server) is closed by the library-package-root heuristic: when no
+   `cli`/`http_server` candidate exists, the strongest package root
+   (`<pkg>/__init__.py` or `src/<pkg>/__init__.py`, ≥2 .py files,
+   tests/docs/examples excluded, src-layout beats top-level) becomes a
+   `library_api` candidate at conf 0.40, and the LLM confirms it from
+   the sampled `__init__.py`. The guard is deliberately narrow
+   (cli/http_server only) so build/CI artifacts never suppress a real
+   import surface; the ≥2-file and excluded-dir rules bound false
+   positives. Click now measures F1=1.0.
 
 3. **Grounding is clean: 0% hallucination** on both flask reports
    (23/23 and 18/18 citations verified against the tree), which is the
@@ -100,10 +144,18 @@ share the one recurring deduction — see limitations.
 
 - Judge scores are single-model (deepseek-v4-flash) with high run
   variance: the same report scored grounding 3 and 5 across runs.
-  Medians over N=4-5 are reported, but the spread is wider than the
+  Medians over N=4-6 are reported, but the spread is wider than the
   prompt effects measured so far.
-- Click/gum cases have no report yet; judge and grounding columns are
-  n/a until `analyze` runs exist for them.
+- All three cases now have reports; grounding is verified for all of
+  them (flask 18/18, click 19/19, gum 20/20 — 0% hallucination each).
+- `eval` re-extracts every case on every invocation, so a full
+  `--judge` run costs roughly 15 GitHub API requests per case and a
+  tokenless budget (60 req/hr per IP) cannot hold repeated judge runs —
+  the 2026-08-24 numbers were assembled from fresh pinned-ref facts
+  plus direct `judge_report` calls, and two parallel `analyze` runs
+  burst the tokenless budget mid-sampling (extraction succeeded, the
+  sample stage 403'd). A `GITHUB_TOKEN` in `.env` removes the
+  constraint; re-verification is one `repo-analyzer eval --judge` away.
 - Gold annotations are the author's manual review, not crowd-verified.
 - The analyzer hardens against provider flakiness (parse retries,
   `LLM_MAX_OUTPUT_TOKENS=32768`), but large reports still occasionally

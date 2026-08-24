@@ -25,8 +25,21 @@
       "false_negatives": [],
       "false_positives": []
     },
-    "grounding": null,
-    "judge": null
+    "grounding": {
+      "total_citations": 20,
+      "verified": 20,
+      "unverified": 0,
+      "hallucination_rate": 0.0,
+      "unverified_list": []
+    },
+    "judge": {
+      "coverage": 5,
+      "grounding": 3,
+      "correctness": 4,
+      "actionability": 5,
+      "usefulness": 4,
+      "comments": "Report covers purpose, architecture, entry points, risks, and contribution paths thoroughly, with a clear reading order and actionable improvement suggestions. Grounding is weakened by claims about PR/issue counts and contributor commit totals cited to README.md, which cannot contain that metadata, and by the inference of 'no unit tests' based on sampled files rather than direct evidence. Several otherwise solid assertions are also presented with specific numbers (e.g., line counts) that are not"
+    }
   },
   {
     "case": "pallets-click",
@@ -43,18 +56,31 @@
     },
     "entrypoints": {
       "gold_count": 1,
-      "predicted_count": 0,
-      "true_positives": [],
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0,
-      "false_negatives": [
+      "predicted_count": 1,
+      "true_positives": [
         "src/click/__init__.py"
       ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_negatives": [],
       "false_positives": []
     },
-    "grounding": null,
-    "judge": null
+    "grounding": {
+      "total_citations": 19,
+      "verified": 19,
+      "unverified": 0,
+      "hallucination_rate": 0.0,
+      "unverified_list": []
+    },
+    "judge": {
+      "coverage": 5,
+      "grounding": 4,
+      "correctness": 4,
+      "actionability": 5,
+      "usefulness": 5,
+      "comments": "Comprehensive report: purpose, architecture with a clear layered dataflow, entry points, execution flow, dependencies, risks, and contribution opportunities are all addressed, plus an honest 'Unknowns' section and a suggested reading order. Grounding is strong (19 citations, all tree-verified, explicit hedges), but several claims rest on files the report admits were not sampled: the core.py/types.py/decorators.py symbol lists and their relationships are supported only indirectly via src/click/__"
+    }
   },
   {
     "case": "pallets-flask",

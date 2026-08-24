@@ -191,19 +191,19 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 
 | Case | 类型 | Structure | Entrypoint P/R/F1 | Grounding | 幻觉 | Judge (c/g/c/a, useful) |
 |---|---|---|---|---|---|---|
-| charmbracelet/gum | 小型 Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | n/a | n/a | n/a |
+| charmbracelet/gum | 小型 Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 20/20 | **0%** | 5/3/4/5, 4 |
 | pallets/flask | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
 | pallets/flask, 收紧前 (A/B) | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
-| pallets/click | 纯 Python 库 | 10/10 (100%) | 0.00 / 0.00 / **0.00** | n/a | n/a | n/a |
+| pallets/click | 纯 Python 库 | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 19/19 | **0%** | 5/4/4/5, 5 |
 
-数字的含义：结构提取完全准确；入口 F1 跟随仓库形态（gum 的单入口 CLI 是最好情形；click 的纯库布局没有可确定性检测的入口——LLM 阶段会点名导入面，记录在 case README）；最硬的保证——0% 幻觉——在两张 flask 报告上都成立。2026-08-23 行是收紧后的复测："证据必须直接"规则（Roadmap 第 1 项，已完成）把引用从 23 收紧到 18，并消除了旧报告的提交数矛盾，但 judge 中位数原地踏步（grounding 3.5 vs 3）——单次运行方差（±2）在 N=4-6 下超过规则效应，且两份报告共享同一个结构性扣分：digest 已验证的度量（提交数、文件大小）没有内容能自证的文件路径（详见 [baseline.md](evals/results/baseline.md)）。
+数字的含义：结构提取完全准确；入口 F1 跟随仓库形态——gum 的单入口 CLI 是最好情形，click 的纯库布局现在也能被检测：确定性包根启发式（Roadmap 第 2 项，2026-08-24 完成）在不存在可运行入口时把 `src/click/__init__.py` 作为 `library_api` 候选产出，LLM 从采样到的 `__init__.py` 确认它，把 0.40 置信度提到 0.90、调用方式 `import click`；最硬的保证——0% 幻觉——现在在**全部三张**报告上都成立（flask 18/18、click 19/19、gum 20/20）。2026-08-23 行是收紧后的复测："证据必须直接"规则（Roadmap 第 1 项，已完成）把引用从 23 收紧到 18，并消除了旧报告的提交数矛盾，但 judge 中位数原地踏步（grounding 3.5 vs 3）——单次运行方差（±2）在 N=4-6 下超过规则效应，且两份报告共享同一个结构性扣分：digest 已验证的度量（提交数、文件大小）没有内容能自证的文件路径（详见 [baseline.md](evals/results/baseline.md)）。
 
 ## Roadmap
 
 MVP（Phase 1-8）已完成。下一批杠杆，按价值排序：
 
 1. ~~**收紧证据规则**~~ — **已完成（2026-08-23）**："被引用文件的内容必须自行展示该断言"现在是 prompt 级规则（CLI 契约 + 全部四个 skill prompts），并纳入 judge rubric；已用 `eval --judge` A/B 复测（引用 23→18，0% 幻觉保持，judge 中位数未变——方差主导）。下一步：解决 digest 度量扣分（提交数/文件大小没有能自证的文件路径）。
-2. **库盲区** — click 的入口 F1 是 0.0，因为纯库没有确定性入口；加一个 LLM 阶段的"导入面"候选，让 LLM 点名它。
+2. ~~**库盲区**~~ — **已完成（2026-08-24）**：确定性包根启发式（`<pkg>/__init__.py` 或 `src/<pkg>/__init__.py`，≥2 个 .py 文件，排除目录名，仅被 cli/http_server 候选抑制）把导入面作为 `library_api` 候选产出；click 的入口 F1 从 0.00 → 1.00（P=1 R=1），flask/gum 不变（回归护栏），click 报告点名 `src/click/__init__.py`，置信度 0.90、调用方式 `import click`。下一步：解决 digest 度量扣分（judge 持续对唯一证据是 digest 已验证数字的断言扣分）。
 3. **更多 gold cases** — Go monorepo、Node CLI、Rust crate；每个都往 baseline 加一行，防 prompt 回归。
 4. **报告语言覆盖** — `REPORT_LANGUAGE` 已存在；端到端验证并打磨中文渲染路径。
 5. **评估深度** — 多模型 judge 集成与分节打分，替代整份报告一个分。
