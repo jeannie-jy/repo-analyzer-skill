@@ -181,6 +181,7 @@ ENTRYPOINT_KINDS = (
     "http_server",
     "worker",
     "library_entry",
+    "library_api",
     "entrypoint_script",
     "build_entry",
     "container_entry",

@@ -126,3 +126,138 @@ def test_missing_manifest_is_skipped_not_an_error() -> None:
     # No package.json in the tree -> fetch 404s -> no candidates from it.
     candidates = extract_entrypoints(FakeClient(), REF, "main", _tree_with("app.py"))
     assert candidates  # app.py rule still fires
+
+
+# ---------------------------------------------------------------------------
+# library package root (import surface): pure libraries with no runnable entry
+# ---------------------------------------------------------------------------
+
+
+def test_library_src_layout_root() -> None:
+    tree = _tree_with(
+        "src/click/__init__.py", "src/click/core.py", "src/click/decorators.py"
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/click/__init__.py"
+    assert lib[0].confidence == 0.40
+    assert lib[0].invocation == "import click"
+
+
+def test_library_pyproject_cli_suppresses_library_candidate() -> None:
+    content = (FIXTURES / "manifest_pyproject.toml").read_text(encoding="utf-8")
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/pyproject.toml",
+        contents_response(content, "pyproject.toml"),
+    )
+    tree = _tree_with("pyproject.toml", "src/flask/__init__.py", "src/flask/app.py")
+    candidates = extract_entrypoints(client, REF, "main", tree)
+    assert _candidates_of_kind(candidates, "cli")
+    assert not _candidates_of_kind(candidates, "library_api")
+
+
+def test_library_top_level_layout() -> None:
+    tree = _tree_with("click/__init__.py", "click/core.py")
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "click/__init__.py"
+    assert lib[0].invocation == "import click"
+
+
+def test_library_excluded_dirs_never_win() -> None:
+    tree = _tree_with(
+        "src/click/__init__.py",
+        "src/click/core.py",
+        "tests/__init__.py",
+        "tests/test_click.py",
+        "examples/__init__.py",
+        "examples/basic.py",
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/click/__init__.py"
+
+
+def test_library_no_init_no_candidate() -> None:
+    tree = _tree_with("src/click/core.py", "src/click/decorators.py")
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    assert not _candidates_of_kind(candidates, "library_api")
+
+
+def test_library_single_file_package_not_a_root() -> None:
+    candidates = extract_entrypoints(
+        FakeClient(), REF, "main", _tree_with("src/click/__init__.py")
+    )
+    assert not _candidates_of_kind(candidates, "library_api")
+
+
+def test_library_main_and_root_coexist() -> None:
+    tree = _tree_with(
+        "src/click/__main__.py", "src/click/__init__.py", "src/click/core.py"
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    assert _candidates_of_kind(candidates, "library_entry")
+    assert _candidates_of_kind(candidates, "library_api")
+
+
+def test_library_src_layout_wins_over_top_level() -> None:
+    # src-layout tier beats a top-level package with more files.
+    tree = _tree_with(
+        "src/click/__init__.py",
+        "src/click/core.py",
+        "click/__init__.py",
+        "click/core.py",
+        "click/decorators.py",
+        "click/termui.py",
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/click/__init__.py"
+
+
+def test_library_largest_package_wins_tiebreak() -> None:
+    tree = _tree_with(
+        "src/foo/__init__.py",
+        "src/foo/a.py",
+        "src/bar/__init__.py",
+        "src/bar/a.py",
+        "src/bar/b.py",
+        "src/bar/c.py",
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/bar/__init__.py"
+    assert lib[0].invocation == "import bar"
+
+
+def test_library_nested_init_not_a_root() -> None:
+    tree = _tree_with(
+        "src/click/__init__.py",
+        "src/click/core.py",
+        "src/click/termui/__init__.py",
+        "src/click/termui/term.py",
+    )
+    candidates = extract_entrypoints(FakeClient(), REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/click/__init__.py"
+
+
+def test_library_not_suppressed_by_dockerfile() -> None:
+    # The skip guard is cli/http_server only — build/CI artifacts must not
+    # suppress a library import surface.
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Dockerfile",
+        contents_response('CMD ["python", "app.py"]\n', "Dockerfile"),
+    )
+    tree = _tree_with("Dockerfile", "src/click/__init__.py", "src/click/core.py")
+    candidates = extract_entrypoints(client, REF, "main", tree)
+    assert _candidates_of_kind(candidates, "container_entry")
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/click/__init__.py"

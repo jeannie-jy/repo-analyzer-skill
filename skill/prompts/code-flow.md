@@ -19,6 +19,11 @@
    deterministic heuristic and the sampled code, and a short `rationale`.
    You may drop candidates the code shows are noise (e.g. a generic
    `app.py` that is not an entry point) — explain why in the rationale.
+   For a library-only repo (no `cli`/`http_server` candidates), the
+   import surface is the entry: name the package root `__init__.py` with
+   kind `library_api`. The deterministic library candidate's low
+   confidence is expected — sample the `__init__.py` and raise the
+   confidence when the code shows a coherent public API.
 2. **execution_flow** — the sequence of steps that happen when the
    project runs (startup path, request/command handling, key components
    touched in order).

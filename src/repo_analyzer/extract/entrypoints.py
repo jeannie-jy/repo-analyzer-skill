@@ -37,6 +37,48 @@ _FILE_RULES: tuple[tuple[str, str, float, str], ...] = (
 _MAKEFILE_TARGET = re.compile(r"^(\.PHONY|run|start|dev|serve|test):", re.M)
 _DOCKERFILE_ENTRY = re.compile(r"^(CMD|ENTRYPOINT)\s+(.+)$", re.M)
 
+# --- library package root: the import surface is the entry ------------------
+_LIBRARY_EXCLUDED_DIRS = {
+    "tests", "test", "docs", "example", "examples",
+    "benchmark", "benchmarks", "demo", "demos",
+    "scripts", "playground", "site", "src",   # "src" is a layout marker, not a package
+}
+_LIBRARY_MIN_PY_FILES = 2
+
+
+def _library_package_root(paths: set[str]) -> tuple[str, str] | None:
+    """Strongest package root as (init_path, package_name), else None.
+
+    Only <pkg>/__init__.py (top-level, 2 segments) or src/<pkg>/__init__.py
+    (src-layout, 3 segments) count as roots — nested packages never do.
+    Excluded dir names never are roots. A root must contain >= 2 .py files
+    (init plus code) to kill stub/empty packages. Deterministic: src-layout
+    wins over top-level (tier), then most .py files, then lexicographically
+    largest name — explicit max() tuple, never set-iteration order.
+    """
+    roots: list[tuple[int, int, str, str, str]] = []
+    for path in paths:
+        if not path.endswith("__init__.py"):
+            continue
+        parts = path.split("/")
+        if len(parts) == 2:
+            pkg_dir, tier = parts[0], 0
+        elif len(parts) == 3 and parts[0] == "src":
+            pkg_dir, tier = parts[1], 1
+        else:
+            continue
+        if pkg_dir in _LIBRARY_EXCLUDED_DIRS:
+            continue
+        prefix = f"src/{pkg_dir}" if tier else pkg_dir
+        py_count = sum(1 for p in paths if p.startswith(prefix + "/") and p.endswith(".py"))
+        if py_count < _LIBRARY_MIN_PY_FILES:
+            continue
+        roots.append((tier, py_count, pkg_dir, path, pkg_dir))
+    if not roots:
+        return None
+    _, _, _, init_path, pkg_name = max(roots)
+    return init_path, pkg_name
+
 
 def extract_entrypoints(
     client: GitHubClient,
@@ -151,6 +193,21 @@ def extract_entrypoints(
                 invocation="make run (typical)",
             )
         )
+
+    # 6. library package root: a pure library's entry is its import surface.
+    #    Skip when a real runnable entry exists (cli/http_server); build/CI
+    #    artifacts (Makefile, Dockerfile) must NOT suppress it.
+    if not any(c.kind in ("cli", "http_server") for c in candidates):
+        root = _library_package_root(paths)
+        if root is not None:
+            init_path, pkg_name = root
+            add(EntrypointCandidate(
+                path=init_path,
+                kind="library_api",
+                heuristic="library package root (import surface)",
+                confidence=0.40,
+                invocation=f"import {pkg_name.replace('-', '_')}",
+            ))
 
     return candidates
 
