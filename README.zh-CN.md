@@ -191,21 +191,22 @@ Skill 驱动一个 9 步工作流（[SKILL.md](SKILL.md) 是给 agent 看的规�
 
 | Case | 类型 | Structure | Entrypoint P/R/F1 | Grounding | 幻觉 | Judge (c/g/c/a, useful) |
 |---|---|---|---|---|---|---|
-| charmbracelet/gum | 小型 Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 20/20 | **0%** | 5/3/4/5, 4 |
-| pallets/flask | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 18/18 | **0%** | 5/3.5/4/4, 4 |
+| charmbracelet/gum | 小型 Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 18/18 | **0%** | 5/5/5/5, 5 |
+| pallets/flask | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 16/16 | **0%** | 5/5/5/5, 5 |
 | pallets/flask, 收紧前 (A/B) | 中型 Python 框架 | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 23/23 | **0%** | 5/3/4.5/5, 4 |
-| pallets/click | 纯 Python 库 | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 19/19 | **0%** | 5/4/4/5, 5 |
+| pallets/click | 纯 Python 库 | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 15/15 | **0%** | 5/4/5/5, 5 |
 
-数字的含义：结构提取完全准确；入口 F1 跟随仓库形态——gum 的单入口 CLI 是最好情形，click 的纯库布局现在也能被检测：确定性包根启发式（Roadmap 第 2 项，2026-08-24 完成）在不存在可运行入口时把 `src/click/__init__.py` 作为 `library_api` 候选产出，LLM 从采样到的 `__init__.py` 确认它，把 0.40 置信度提到 0.90、调用方式 `import click`；最硬的保证——0% 幻觉——现在在**全部三张**报告上都成立（flask 18/18、click 19/19、gum 20/20）。2026-08-23 行是收紧后的复测："证据必须直接"规则（Roadmap 第 1 项，已完成）把引用从 23 收紧到 18，并消除了旧报告的提交数矛盾，但 judge 中位数原地踏步（grounding 3.5 vs 3）——单次运行方差（±2）在 N=4-6 下超过规则效应，且两份报告共享同一个结构性扣分：digest 已验证的度量（提交数、文件大小）没有内容能自证的文件路径（详见 [baseline.md](evals/results/baseline.md)）。
+数字的含义：结构提取完全准确；入口 F1 跟随仓库形态——gum 的单入口 CLI 是最好情形，click 的纯库布局也能被检测（确定性包根启发式，Roadmap 第 2 项，把 `src/click/__init__.py` 作为 `library_api` 候选产出，LLM 采样确认后把 0.40 置信度提到 0.90、调用方式 `import click`），flask 的 0.67 是贪心召回的设计代价（三个真实入口全中，三个预期误报被重新排序掉）。最硬的保证——0% 幻觉——在**全部三张**报告上都成立（2026-08-27 快照：flask 16/16、click 15/15、gum 18/18）。2026-08-27 行是 Roadmap 第 3 项（digest 度量扣分）落地后的复测：报告现在自带确定性 **Verified Facts** 附录（pipeline 计算、绝不经 LLM），judge rubric 豁免与附录匹配的声明。grounding 中位数 3 → 5（gum）、3.5 → 5（flask），correctness/usefulness 随之上升，judge 评论中反复出现的"没有文件内容能自证这个数字"类扣分全部消失；同一 rubric 下无附录的旧 flask 报告仍得 grounding 3——豁免来自附录本身，而非 rubric 放宽（详见 [baseline.md](evals/results/baseline.md)）。
 
 ## Roadmap
 
 MVP（Phase 1-8）已完成。下一批杠杆，按价值排序：
 
-1. ~~**收紧证据规则**~~ — **已完成（2026-08-23）**："被引用文件的内容必须自行展示该断言"现在是 prompt 级规则（CLI 契约 + 全部四个 skill prompts），并纳入 judge rubric；已用 `eval --judge` A/B 复测（引用 23→18，0% 幻觉保持，judge 中位数未变——方差主导）。下一步：解决 digest 度量扣分（提交数/文件大小没有能自证的文件路径）。
-2. ~~**库盲区**~~ — **已完成（2026-08-24）**：确定性包根启发式（`<pkg>/__init__.py` 或 `src/<pkg>/__init__.py`，≥2 个 .py 文件，排除目录名，仅被 cli/http_server 候选抑制）把导入面作为 `library_api` 候选产出；click 的入口 F1 从 0.00 → 1.00（P=1 R=1），flask/gum 不变（回归护栏），click 报告点名 `src/click/__init__.py`，置信度 0.90、调用方式 `import click`。下一步：解决 digest 度量扣分（judge 持续对唯一证据是 digest 已验证数字的断言扣分）。
-3. **更多 gold cases** — Go monorepo、Node CLI、Rust crate；每个都往 baseline 加一行，防 prompt 回归。
-4. **报告语言覆盖** — `REPORT_LANGUAGE` 已存在；端到端验证并打磨中文渲染路径。
-5. **评估深度** — 多模型 judge 集成与分节打分，替代整份报告一个分。
+1. ~~**收紧证据规则**~~ — **已完成（2026-08-23）**："被引用文件的内容必须自行展示该断言"现在是 prompt 级规则（CLI 契约 + 全部四个 skill prompts），并纳入 judge rubric；已用 `eval --judge` A/B 复测（引用 23→18，0% 幻觉保持，judge 中位数未变——方差主导）。
+2. ~~**库盲区**~~ — **已完成（2026-08-24）**：确定性包根启发式（`<pkg>/__init__.py` 或 `src/<pkg>/__init__.py`，≥2 个 .py 文件，排除目录名，仅被 cli/http_server 候选抑制）把导入面作为 `library_api` 候选产出；click 的入口 F1 从 0.00 → 1.00（P=1 R=1），flask/gum 不变（回归护栏），click 报告点名 `src/click/__init__.py`，置信度 0.90、调用方式 `import click`。
+3. ~~**digest 度量扣分**~~ — **已完成（2026-08-27）**：报告自带确定性 `digest_facts` 附录，渲染为 **Verified Facts** 节（pipeline 从 `RepoFacts` 计算，绝不经 LLM）；judge rubric 豁免与附录匹配的声明（数值不一致或附录未列出的数字照常扣分）；prompt 契约里悬空的"digest 归因路径"豁免句改为指向该节。零 schema 变更，旧报告渲染逐字节不变。复测（N=3 中位数）：gum 5/5/5/5、click 5/4/5/5、flask 5/5/5/5——grounding 中位数 3→5（gum）、3.5→5（flask）；"没有文件能自证这个数字"类扣分从 judge 评论中消失，且 judge 现在能抓住旧报告"30 天窗口内 1,855 次提交"的融合重算错误。同 rubric A/B：无附录的旧 flask 报告仍得 grounding 3——豁免来自附录而非 rubric 放宽。
+4. **更多 gold cases** — Go monorepo、Node CLI、Rust crate；每个都往 baseline 加一行，防 prompt 回归。
+5. **报告语言覆盖** — `REPORT_LANGUAGE` 已存在；端到端验证并打磨中文渲染路径。
+6. **评估深度** — 多模型 judge 集成与分节打分，替代整份报告一个分。
 
 > 注：分析报告本身默认英文输出（`REPORT_LANGUAGE` 可配置），本中文 README 是项目文档的本地化版本。

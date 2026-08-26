@@ -26,19 +26,19 @@
       "false_positives": []
     },
     "grounding": {
-      "total_citations": 20,
-      "verified": 20,
+      "total_citations": 18,
+      "verified": 18,
       "unverified": 0,
       "hallucination_rate": 0.0,
       "unverified_list": []
     },
     "judge": {
       "coverage": 5,
-      "grounding": 3,
-      "correctness": 4,
+      "grounding": 5,
+      "correctness": 5,
       "actionability": 5,
-      "usefulness": 4,
-      "comments": "Report covers purpose, architecture, entry points, risks, and contribution paths thoroughly, with a clear reading order and actionable improvement suggestions. Grounding is weakened by claims about PR/issue counts and contributor commit totals cited to README.md, which cannot contain that metadata, and by the inference of 'no unit tests' based on sampled files rather than direct evidence. Several otherwise solid assertions are also presented with specific numbers (e.g., line counts) that are not"
+      "usefulness": 5,
+      "comments": "Comprehensive report covering purpose, architecture, entry points, risks, and contribution paths, with strong grounding (18/18 citations verified) and plausible technical claims. Minor coverage gap: several subcommands (confirm, input, write, format, log) are not profiled as core modules, though they appear in the tech stack/dependencies. Actionability is excellent with concrete file-level tasks and mitigations, and the reading order + unknowns give a newcomer a clear path into the codebase."
     }
   },
   {
@@ -67,8 +67,8 @@
       "false_positives": []
     },
     "grounding": {
-      "total_citations": 19,
-      "verified": 19,
+      "total_citations": 15,
+      "verified": 15,
       "unverified": 0,
       "hallucination_rate": 0.0,
       "unverified_list": []
@@ -76,10 +76,10 @@
     "judge": {
       "coverage": 5,
       "grounding": 4,
-      "correctness": 4,
+      "correctness": 5,
       "actionability": 5,
       "usefulness": 5,
-      "comments": "Comprehensive report: purpose, architecture with a clear layered dataflow, entry points, execution flow, dependencies, risks, and contribution opportunities are all addressed, plus an honest 'Unknowns' section and a suggested reading order. Grounding is strong (19 citations, all tree-verified, explicit hedges), but several claims rest on files the report admits were not sampled: the core.py/types.py/decorators.py symbol lists and their relationships are supported only indirectly via src/click/__"
+      "comments": "The report comprehensively covers purpose, architecture, entry points, risks, and contribution paths, and provides a clear reading order. Grounding is strong overall (15/15 citations verified) but a few assertions lack direct citations (e.g., 'one of the largest and most active repos in the Pallets ecosystem,' 'examples will resolve to released 8.x,' and 'PowerShell added 8.5.0' without a cited source). Technical details match the verified facts and file contents; the contribution opportunities "
     }
   },
   {
@@ -114,19 +114,19 @@
       ]
     },
     "grounding": {
-      "total_citations": 18,
-      "verified": 18,
+      "total_citations": 16,
+      "verified": 16,
       "unverified": 0,
       "hallucination_rate": 0.0,
       "unverified_list": []
     },
     "judge": {
       "coverage": 5,
-      "grounding": 4,
-      "correctness": 4,
-      "actionability": 4,
-      "usefulness": 4,
-      "comments": "Comprehensive report covering purpose, layered architecture (WSGI Flask -> sansio App -> Scaffold), entry points (CLI, __main__, test wsgi, app.py false positive), execution flow, risks, and contribution paths. Grounding is generally strong with 18 citations tied to specific files; however, the maintainer-concentration risk citing CHANGES.rst for commit counts is questionable (a changelog would not substantiate 'davidism 1855, mitsuhiko 1189 commits'), and line/byte counts are presented as fact "
+      "grounding": 5,
+      "correctness": 5,
+      "actionability": 5,
+      "usefulness": 5,
+      "comments": "The report is exceptionally thorough: it covers purpose, architecture, entry points, dependencies, risks, and contribution paths with a clear reading order. Grounding is strong��all 16 citations verify against the tree, and the report explicitly flags anything not directly sampled in an Unknowns section, so unsupported claims are avoided. Technical details (request lifecycle, sansio separation, CLI discovery, ctx compat shim) match known Flask internals and the pipeline-computed facts are used co"
     }
   }
 ]

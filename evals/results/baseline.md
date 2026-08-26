@@ -96,6 +96,56 @@ tokenless GitHub budget (60 req/hr per IP). A `GITHUB_TOKEN` was
 configured on 2026-08-24, so `repo-analyzer eval --output-dir output
 --judge` now reproduces these numbers end to end.
 
+## Results (2026-08-27) — digest-metric deduction closed
+
+Roadmap item (digest metrics) landed: reports now carry a deterministic
+`digest_facts` annex — pipeline-computed from `RepoFacts`, never
+LLM-authored — rendered as a "Verified Facts" section before Overview.
+The judge rubric grants an exemption: a claim whose number matches the
+section is fully grounded; a value that differs from it, or a number
+the section does not list, counts against grounding. The prompt
+contract's vacuous "the path the digest attributes it to" exemption now
+points at the section, and digest facts are never `unknowns`. Zero
+schema change; reports without the annex (e.g. the `examples/` flask
+report) render and judge exactly as before.
+
+All three reports were regenerated (refs are live `main` — the
+snapshots moved since 08-24, so numbers differ from earlier rows; the
+annex is self-consistent ground truth for the new snapshot). Judge
+scores are N=3 medians; grounding is the mechanical `verify-evidence`
+count.
+
+| Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
+|---|---|---|---|---|---|---|
+| charmbracelet/gum | small Go CLI | 8/8 (100%) | 1.00 / 1.00 / **1.00** | 18/18 | **0%** | 5/5/5/5, 5 |
+| pallets/click | pure Python library | 10/10 (100%) | 1.00 / 1.00 / **1.00** | 15/15 | **0%** | 5/4/5/5, 5 |
+| pallets/flask | medium Python framework | 10/10 (100%) | 0.50 / 1.00 / **0.67** | 16/16 | **0%** | 5/5/5/5, 5 |
+
+Grounding medians: gum 3 → 5, flask 3.5 → 5 (vs the 08-23/08-24 rows),
+click stays 4. Correctness and usefulness also moved up (gum 4→5,
+flask 4→5). The primary signal is the judge's comments, not the
+medians (single-run variance is ±2):
+
+- The recurring deduction language is gone: no more "PR/issue counts
+  cited to README.md, which cannot contain them", no more "file
+  size/line counts citing the file itself", no more "commit counts
+  cited to CHANGES.rst". Instead the judge names the section
+  approvingly: "the 'Verified Facts' section is clearly labeled as
+  pipeline-computed ground truth" (gum), "numbers match the Verified
+  Facts section" (click), "pipeline-computed facts are restated
+  accurately" (flask).
+- Remaining deductions are out of annex scope and legitimate:
+  inferences (gum's testing strategy), uncited assertions ("one of the
+  largest and most active repos in the Pallets ecosystem"), and a
+  correctness flag on a claimed module path (`charm.land/gum/v2`).
+
+A/B under the SAME new rubric: the pre-annex flask report
+(`examples/reports/pallets-flask`, no annex section) judges grounding
+2/4/3 → median 3 — the same structural deductions recur, including the
+"1,855 commits in a 30-day window of 16 commits" fusion error, which
+the judge now catches against the annex's ground truth in the new
+report. The exemption is the annex, not a looser rubric.
+
 ## Reading the numbers
 
 1. **Structure extraction is exact (28/28 gold paths).** The tree is
@@ -135,10 +185,11 @@ configured on 2026-08-24, so `repo-analyzer eval --output-dir output
    whose content does not state its own size). These are digest-facts
    with no file path that demonstrates them; the schema requires at
    least one evidence path, so the report cites the subject path and
-   the judge deducts. This is a design boundary, not a prompt fix —
-   candidates: let digest-sourced claims carry a `digest` marker the
-   judge accepts, or move such claims to `unknowns` at the cost of
-   coverage (they are verified, so losing them is a loss).
+   the judge deducts. Closed 2026-08-27: the report now carries a
+   deterministic `digest_facts` annex ("Verified Facts" section) that
+   gives the judge the ground truth, and the rubric exempts claims
+   matching it — grounding medians 3.5→5 (flask), 3→5 (gum); see the
+   08-27 section and its A/B.
 
 ## Known limitations
 
@@ -147,7 +198,8 @@ configured on 2026-08-24, so `repo-analyzer eval --output-dir output
   Medians over N=4-6 are reported, but the spread is wider than the
   prompt effects measured so far.
 - All three cases now have reports; grounding is verified for all of
-  them (flask 18/18, click 19/19, gum 20/20 — 0% hallucination each).
+  them (flask 16/16, click 15/15, gum 18/18 on the 08-27 snapshot —
+  0% hallucination each).
 - `eval` re-extracts every case on every invocation, so a full
   `--judge` run costs roughly 15 GitHub API requests per case and a
   tokenless budget (60 req/hr per IP) cannot hold repeated judge runs —

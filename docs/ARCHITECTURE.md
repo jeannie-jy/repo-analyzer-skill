@@ -269,7 +269,7 @@ CLI 驱动模式由 `pipeline/analyze.py` 实现同一序列（用 LLM provider 
 | structure extraction accuracy | 与 git archive 对照（确定性） | Phase 8 |
 | entrypoint detection accuracy | precision / recall / F1 vs gold | Phase 8 |
 | architecture quality | LLM-as-judge rubric（coverage / grounding / correctness / actionability） | Phase 8 |
-| evidence grounding | 确定性 citation 校验（路径是否真实存在于 tree）——存在性由 `evidence.py` 机械检查；"直接支撑"语义由 prompt 规则 + judge rubric 约束（机制无法判断语义） | Phase 8 |
+| evidence grounding | 确定性 citation 校验（路径是否真实存在于 tree）——存在性由 `evidence.py` 机械检查；"直接支撑"语义由 prompt 规则 + judge rubric 约束（机制无法判断语义）。digest 数字类事实没有能自证的文件路径：报告携带确定性 `digest_facts` 附录（"Verified Facts" 节）承载它们，judge 对照附录判断（2026-08-27） | Phase 8 |
 | hallucination rate | unverified citation 占比 + judge 复核标记的虚假断言 | Phase 8 |
 | report usefulness | judge 1-5 + 人工抽检 | Phase 8 之后持续 |
 
