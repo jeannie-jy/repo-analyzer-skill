@@ -43,7 +43,12 @@ report on four criteria and overall usefulness, each 1-5 (5 = best):
   unsupported assertions? Evidence must directly support its claim: the
   cited file's content shows the claim itself. A citation that merely
   implies the claim (the file relates, but its content does not prove
-  it) counts against grounding.
+  it) counts against grounding. Exception: the report's "Verified Facts"
+  section lists numbers computed by the deterministic pipeline
+  (ground truth, not report-author claims). A claim that restates one
+  of those numbers is grounded by that section: a value matching the
+  section is fully grounded; a value that differs from it, or a number
+  the section does not list, counts against grounding.
 - correctness: are the technical claims accurate for this codebase
   (no invented APIs, wrong data flows, or guessed numbers)?
 - actionability: are the risks and contribution opportunities concrete

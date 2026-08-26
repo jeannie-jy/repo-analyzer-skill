@@ -82,6 +82,19 @@ def test_all_prompt_sections_share_the_directness_rule() -> None:
         assert "claim to `unknowns`" in section  # the replace-or-unknowns escape hatch
 
 
+def test_contract_exemption_points_at_verified_facts(tmp_path) -> None:
+    """Digest-number claims are anchored to the report's Verified Facts
+    section (the vacuous "path the digest attributes it to" is gone)."""
+    from repo_analyzer.context.code_sampler import sample_code
+
+    facts = _facts(tmp_path)
+    sample = sample_code(_full_client(), REF, "main", facts, budget=40_000)
+    messages = build_analysis_messages(facts, sample)
+    assert '"Verified Facts"' in messages[0]["content"]  # the CLI contract
+    for section in load_prompt_sections():
+        assert '"Verified Facts"' in section
+
+
 def test_prompt_dir_override_and_fallback(tmp_path) -> None:
     custom = tmp_path / "prompts"
     custom.mkdir()

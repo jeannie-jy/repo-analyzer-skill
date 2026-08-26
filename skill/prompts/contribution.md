@@ -26,8 +26,12 @@ Propose concrete, actionable contribution opportunities for a newcomer:
   claim (a class definition, a dependency entry, a registration call). A
   path that only relates to the claim without proving it is indirect —
   replace it with the file that demonstrates the claim, or move the
-  claim to `unknowns`. A claim restating a verified fact from the digest
-  is directly supported by the path the digest attributes it to.
+  claim to `unknowns`. A claim that restates a verified number from the
+  facts digest is covered by the report's "Verified Facts" section,
+  which the pipeline renders from the digest; keep citing the most
+  relevant existing path as a topic anchor — the number itself is
+  verified by the digest, not by that file's content. Digest facts are
+  never `unknowns` — they are verified.
 - "Low difficulty" means a bounded change in one file; be honest about
   scope — a claim of easy work that isn't is worse than no claim.
 

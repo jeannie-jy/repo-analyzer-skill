@@ -144,6 +144,9 @@ def test_analyze_writes_artifacts(tmp_path) -> None:
     md = (workdir / REPORT_MD_FILENAME).read_text(encoding="utf-8")
     assert "Repository Analysis Report" in md
     assert "## Risks" in md
+    # the deterministic digest annex survives the disk round-trip and renders
+    assert report["digest_facts"]["git"]["commits_last_30d"] == 3
+    assert "## Verified Facts (pipeline-computed)" in md
 
 
 def test_analyze_tolerates_fenced_json(tmp_path) -> None:

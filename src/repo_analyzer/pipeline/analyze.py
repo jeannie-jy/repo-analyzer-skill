@@ -34,6 +34,7 @@ from ..models import (
     RepoFacts,
     RepoRef,
 )
+from ..report.digest_facts import build_digest_facts
 from ..report.render import render_markdown
 from ..report.schema import REPORT_SCHEMA_VERSION, assert_valid, validate_analysis
 from .evidence import verify_evidence
@@ -112,6 +113,11 @@ def analyze(
         "analysis": parsed,
         "evidence_summary": evidence.to_dict(),
         "warnings": list(facts.warnings),
+        # Deterministic digest annex (never LLM-produced): lets the report
+        # carry the verified numbers claims restate, so the judge and any
+        # reader can check them against ground truth. Sibling of
+        # "analysis" — invisible to validate_analysis / verify_evidence.
+        "digest_facts": build_digest_facts(facts),
     }
     report_md = render_markdown(report)
 

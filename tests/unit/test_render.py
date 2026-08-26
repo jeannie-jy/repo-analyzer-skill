@@ -62,6 +62,41 @@ def test_grounding_flags_unverified() -> None:
     assert "`does/not/exist.py`" in md
 
 
+def test_verified_facts_section_renders_before_overview() -> None:
+    report = {
+        **REPORT,
+        "digest_facts": {
+            "metadata": {"stars": 71123, "forks": 10, "open_issues_count": 0},
+            "languages": [],
+            "git": {
+                "last_commit_at": None,
+                "commits_last_30d": 3,
+                "commits_30d_capped": False,
+                "open_issues": 0,
+                "open_pulls": 0,
+                "top_contributors": [],
+            },
+            "files": {
+                "total_files": 11,
+                "total_bytes": 1000,
+                "files_by_extension": {},
+                "largest_files": [],
+                "line_counts": {},
+            },
+        },
+    }
+    md = render_markdown(report)
+    assert "## Verified Facts (pipeline-computed)" in md
+    # ground truth lands before the claim sections
+    assert md.index("## Verified Facts (pipeline-computed)") < md.index("## Overview")
+    assert "71,123 stars" in md
+
+
+def test_no_verified_facts_section_without_annex() -> None:
+    md = render_markdown(REPORT)
+    assert "Verified Facts" not in md
+
+
 def test_warnings_surface_as_degraded_note() -> None:
     md = render_markdown(REPORT)
     assert "degraded facts" in md

@@ -84,6 +84,11 @@ def test_collect_paths_nested() -> None:
     assert _collect_paths({"a": [{"evidence": ["x"]}, {"related_files": ["z"]}]}) == ["x", "z"]
     # non-string and empty entries are ignored
     assert _collect_paths({"a": {"evidence": ["x", 7, ""]}}) == ["x"]
+    # the deterministic digest annex is a sibling of analysis, never a
+    # citation source (its "path" keys must not leak into evidence counts)
+    assert _collect_paths(
+        {"digest_facts": {"files": {"largest_files": [{"path": "a.py"}]}}}
+    ) == []
 
 
 def test_to_dict() -> None:

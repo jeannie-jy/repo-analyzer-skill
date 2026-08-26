@@ -47,9 +47,12 @@ IRON RULES:
   claim (a class definition, a dependency entry, a registration call). A
   path that only relates to the claim without proving it is indirect
   evidence — replace it with the file that demonstrates the claim, or
-  move the claim to "unknowns". A claim restating a verified fact from
-  the digest is directly supported by the path the digest attributes it
-  to.
+  move the claim to "unknowns". A claim that restates a verified number
+  from the facts digest is covered by the report's "Verified Facts"
+  section, which the pipeline renders from the digest; keep citing the
+  most relevant existing path as a topic anchor — the number itself is
+  verified by the digest, not by that file's content. Digest facts are
+  never "unknowns" — they are verified.
 - Never invent facts, numbers, or files. Anything unanswerable from the
   digest or sample goes into "unknowns".
 - Never repeat or guess metadata the digest already provides (stars,
@@ -69,7 +72,9 @@ reading_order, contribution_opportunities, unknowns. Every claim must
 carry an "evidence" array of file paths from the digest or sample, and
 the cited file's content must directly support the claim (not merely
 relate to it); never invent facts; put unanswered questions in
-"unknowns". Output only JSON."""
+"unknowns". Claims restating numbers from the facts digest are grounded
+by the report's "Verified Facts" section; cite a relevant path as
+anchor. Output only JSON."""
 
 
 def load_prompt_sections(prompt_dir: str | Path | None = None) -> list[str]:

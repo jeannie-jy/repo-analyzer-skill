@@ -3,12 +3,16 @@
 Rendering is deterministic and dependency-free: same report.json always
 produces the same report.md. Every evidence array renders as inline
 backticked paths, so the grounding of each claim stays visible in the
-final document.
+final document. A ``digest_facts`` top-level block (pipeline-computed)
+renders as the "Verified Facts" section; reports without it render as
+before.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from .digest_facts import SECTION_TITLE, render_digest_facts
 
 REPORT_TITLE = "Repository Analysis Report"
 
@@ -51,6 +55,12 @@ def render_markdown(report: dict) -> str:
         for warning in warnings:
             lines.append(f"> - {warning}")
         lines.append("")
+
+    # Verified-facts annex first, so the judge (and any reader) sees the
+    # pipeline-verified numbers before the claim sections that restate them.
+    annex = report.get("digest_facts")
+    if annex:
+        lines.extend(_render_section(SECTION_TITLE, render_digest_facts(annex)))
 
     lines.extend(_render_section("Overview", _render_overview(analysis)))
     lines.extend(_render_section("Tech Stack", _render_tech_stack(analysis)))

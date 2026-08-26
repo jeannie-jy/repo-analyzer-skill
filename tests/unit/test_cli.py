@@ -206,6 +206,18 @@ def test_validate_report_accepts_and_rejects(tmp_path) -> None:
     bad.write_text(json.dumps({"schema_version": "1.0", "analysis": {"overview": {}}}), encoding="utf-8")
     assert main(["validate-report", str(bad)]) == 1
 
+    # the deterministic digest annex is a top-level sibling of analysis —
+    # validate-report only checks the analysis subtree, so it passes
+    with_annex = tmp_path / "with_annex.json"
+    with_annex.write_text(
+        json.dumps(
+            {"schema_version": "1.0", "analysis": VALID_ANALYSIS,
+             "digest_facts": {"git": {"commits_last_30d": 3}}}
+        ),
+        encoding="utf-8",
+    )
+    assert main(["validate-report", str(with_annex)]) == 0
+
 
 def test_verify_evidence_grounding(tmp_path, capsys) -> None:
     facts = tmp_path / FACTS_FILENAME

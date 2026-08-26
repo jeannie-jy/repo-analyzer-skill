@@ -163,6 +163,29 @@ def test_judge_report_parses_scores() -> None:
     assert "# Report" in llm.calls[0][1]["content"]
 
 
+def test_judge_rubric_mentions_verified_facts_and_keeps_directly_support() -> None:
+    """The digest-annex exemption joined the rubric without loosening the
+    direct-evidence rule that guards against invented citations."""
+    llm = FakeLLM(
+        [
+            json.dumps(
+                {
+                    "coverage": 5,
+                    "grounding": 5,
+                    "correctness": 5,
+                    "actionability": 5,
+                    "usefulness": 5,
+                    "comments": "ok",
+                }
+            )
+        ]
+    )
+    judge_report(llm, "report", "x/y", "https://github.com/x/y")
+    system = llm.calls[0][0]["content"]
+    assert "Verified Facts" in system
+    assert "directly support" in system
+
+
 def test_judge_report_rejects_out_of_range_scores() -> None:
     llm = FakeLLM([json.dumps({"coverage": 9, "grounding": 5, "correctness": 5,
                                "actionability": 5, "usefulness": 5})])
