@@ -9,7 +9,8 @@ Outputs under <output_dir>/repos/<owner>/<repo>/:
 - ``sample_manifest.json`` (what was shown to the LLM, without contents)
 - ``analysis.json`` (the validated LLM reasoning — audit trail)
 - ``report.json`` (analysis + evidence summary, schema-validated)
-- ``report.md`` (deterministic English markdown render)
+- ``report.md`` (deterministic markdown render; language from
+  ``REPORT_LANGUAGE``, recorded as the report's ``language`` key)
 """
 
 from __future__ import annotations
@@ -79,6 +80,7 @@ def analyze(
     budget: int,
     fetch_raw_fn: Callable[[RepoRef, str, str], str] | None = None,
     prompt_dir: str | Path | None = None,
+    language: str = "en",
 ) -> AnalysisOutput:
     """Run extract -> sample -> LLM reasoning -> validate -> repair -> report.
 
@@ -93,7 +95,9 @@ def analyze(
     branch = facts.repo.get("branch") or "main"
 
     sample = sample_code(client, ref, branch, facts, budget=budget)
-    messages = build_analysis_messages(facts, sample, prompt_dir=prompt_dir)
+    messages = build_analysis_messages(
+        facts, sample, prompt_dir=prompt_dir, language=language
+    )
     response, parsed = _complete_parsed(llm, messages)
 
     for _ in range(MAX_REPAIR_ATTEMPTS):
@@ -118,6 +122,9 @@ def analyze(
         # reader can check them against ground truth. Sibling of
         # "analysis" — invisible to validate_analysis / verify_evidence.
         "digest_facts": build_digest_facts(facts),
+        # Render language (REPORT_LANGUAGE); the markdown render reads it
+        # back, so report.json is self-contained and re-renderable.
+        "language": language,
     }
     report_md = render_markdown(report)
 

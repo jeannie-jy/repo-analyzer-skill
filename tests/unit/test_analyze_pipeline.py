@@ -149,6 +149,35 @@ def test_analyze_writes_artifacts(tmp_path) -> None:
     assert "## Verified Facts (pipeline-computed)" in md
 
 
+def test_analyze_language_flows_through(tmp_path) -> None:
+    llm = FakeLLM([json.dumps(VALID_ANALYSIS)])
+    result = analyze(
+        _client_with_app(),
+        llm,
+        REF,
+        output_dir=tmp_path,
+        budget=40_000,
+        fetch_raw_fn=_noop_raw,
+        language="zh",
+    )
+    assert result.report["language"] == "zh"
+    # the zh directive reached the LLM's system message
+    assert "LANGUAGE:" in llm.calls[0][0]["content"]
+    # report.json records the language; report.md renders zh labels
+    workdir = tmp_path / "repos" / "pallets" / "flask"
+    on_disk = json.loads((workdir / REPORT_FILENAME).read_text(encoding="utf-8"))
+    assert on_disk["language"] == "zh"
+    assert on_disk["digest_facts"] is not None  # annex survives the round-trip
+    md = (workdir / REPORT_MD_FILENAME).read_text(encoding="utf-8")
+    assert "# 仓库分析报告: pallets/flask" in md
+    assert "## 概述" in md
+
+
+def test_analyze_default_language_is_en(tmp_path) -> None:
+    result, _ = _run_analyze(tmp_path, json.dumps(VALID_ANALYSIS))
+    assert result.report["language"] == "en"
+
+
 def test_analyze_tolerates_fenced_json(tmp_path) -> None:
     fenced = f"```json\n{json.dumps(VALID_ANALYSIS)}\n```"
     result, _ = _run_analyze(tmp_path, fenced)

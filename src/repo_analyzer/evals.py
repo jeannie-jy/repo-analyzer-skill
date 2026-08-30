@@ -49,6 +49,12 @@ report on four criteria and overall usefulness, each 1-5 (5 = best):
   of those numbers is grounded by that section: a value matching the
   section is fully grounded; a value that differs from it, or a number
   the section does not list, counts against grounding.
+- Reports may be written in English or Chinese (a REPORT_LANGUAGE
+  setting): judge content regardless of the report's language, and
+  write your comments in the report's language. The pipeline-computed
+  annex appears under "Verified Facts" (Chinese title:
+  已验证事实 (Verified Facts, pipeline-computed)) — the exemption above
+  applies under either title.
 - correctness: are the technical claims accurate for this codebase
   (no invented APIs, wrong data flows, or guessed numbers)?
 - actionability: are the risks and contribution opportunities concrete

@@ -77,6 +77,29 @@ by the report's "Verified Facts" section; cite a relevant path as
 anchor. Output only JSON."""
 
 
+def _language_instruction(language: str) -> str | None:
+    """Content-language directive for non-English reports, else None.
+
+    The renderer supplies section titles and labels itself, so the LLM
+    only translates free-text content. The pinning sentence matters:
+    enum values (``kind``/``severity``/``category``/``difficulty``) and
+    structural keys are schema-enforced — translating them would fail
+    validation and burn the repair loop.
+    """
+    if language != "zh":
+        return None
+    return (
+        "LANGUAGE: Write all free-text content (summary, purpose, "
+        "responsibility, rationale, descriptions, mitigations, unknowns) "
+        "in Chinese (zh). Everything structural stays exactly as "
+        "specified: the 13 top-level JSON keys, the enum values "
+        "(tech_stack[].category, entry_points[].kind, risks[].severity, "
+        "contribution_opportunities[].difficulty), file paths, code "
+        "symbols, and numbers. The markdown renderer supplies section "
+        "titles and labels in the report's language itself."
+    )
+
+
 def load_prompt_sections(prompt_dir: str | Path | None = None) -> list[str]:
     """Read the reasoning guidance assets, in section order.
 
@@ -100,10 +123,15 @@ def build_analysis_messages(
     sample: CodeSample,
     *,
     prompt_dir: str | Path | None = None,
+    language: str = "en",
 ) -> list[LLMMessage]:
-    """System message = contract + reasoning sections; user message =
-    facts digest + code sample + task."""
-    system = "\n\n".join([_OUTPUT_CONTRACT, *load_prompt_sections(prompt_dir)])
+    """System message = contract + reasoning sections + language directive;
+    user message = facts digest + code sample + task."""
+    instruction = _language_instruction(language)
+    system_parts = [_OUTPUT_CONTRACT, *load_prompt_sections(prompt_dir)]
+    if instruction:
+        system_parts.append(instruction)
+    system = "\n\n".join(system_parts)
     user = "\n\n".join(
         [
             render_facts_digest(facts),

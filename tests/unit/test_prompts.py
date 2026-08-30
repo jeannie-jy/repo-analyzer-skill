@@ -109,3 +109,36 @@ def test_prompt_dir_override_and_fallback(tmp_path) -> None:
     assert len(fallback) == 1
     assert "Output only JSON" in fallback[0]
     assert "directly support" in fallback[0]
+
+
+def test_language_instruction_appended_for_zh(tmp_path) -> None:
+    """zh adds a directive: free text in Chinese, structure pinned to the
+    schema (enums, keys, paths, numbers) — translating enums would fail
+    validation and burn the repair loop."""
+    from repo_analyzer.context.code_sampler import sample_code
+
+    facts = _facts(tmp_path)
+    sample = sample_code(_full_client(), REF, "main", facts, budget=40_000)
+    system = build_analysis_messages(facts, sample, language="zh")[0]["content"]
+
+    assert "LANGUAGE:" in system
+    assert "in Chinese" in system
+    # structure stays pinned: enums, keys, paths, numbers
+    assert "entry_points[].kind" in system
+    assert "risks[].severity" in system
+    assert "contribution_opportunities[].difficulty" in system
+    assert "13 top-level JSON keys" in system
+    # existing contract guards still hold under zh
+    assert "IRON RULES" in system
+    assert '"Verified Facts"' in system
+
+
+def test_en_messages_identical_with_language_param(tmp_path) -> None:
+    from repo_analyzer.context.code_sampler import sample_code
+
+    facts = _facts(tmp_path)
+    sample = sample_code(_full_client(), REF, "main", facts, budget=40_000)
+    default = build_analysis_messages(facts, sample)
+    explicit = build_analysis_messages(facts, sample, language="en")
+    assert explicit == default
+    assert "LANGUAGE:" not in default[0]["content"]

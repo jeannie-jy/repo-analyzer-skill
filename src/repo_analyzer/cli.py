@@ -179,7 +179,12 @@ def _cmd_analyze(args: argparse.Namespace, settings: Settings) -> int:
     client = GitHubClient(settings)
     llm = OpenAICompatClient(settings)
     result = analyze(
-        client, llm, ref, output_dir=output_dir, budget=settings.token_budget
+        client,
+        llm,
+        ref,
+        output_dir=output_dir,
+        budget=settings.token_budget,
+        language=settings.report_language,
     )
 
     sections = sorted(

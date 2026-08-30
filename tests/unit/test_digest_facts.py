@@ -12,6 +12,7 @@ from repo_analyzer.report.digest_facts import (
     SECTION_TITLE,
     build_digest_facts,
     render_digest_facts,
+    section_title,
 )
 
 from .test_facts_pipeline import REF, _full_client, _noop_raw
@@ -138,3 +139,52 @@ def test_render_annex_marks_capped_commits() -> None:
 
 def test_section_title_identifies_pipeline_computation() -> None:
     assert SECTION_TITLE == "Verified Facts (pipeline-computed)"
+
+
+def test_section_title_zh_keeps_english_anchor() -> None:
+    # The prompt contract and the judge rubric name the section
+    # "Verified Facts" — the zh title keeps the anchor so both stay true.
+    assert section_title() == SECTION_TITLE
+    assert section_title("en") == SECTION_TITLE
+    assert section_title("zh") == "已验证事实 (Verified Facts, pipeline-computed)"
+
+
+def test_render_annex_zh_labels() -> None:
+    annex = {
+        "metadata": {"stars": 17633, "forks": 1947, "open_issues_count": 87},
+        "languages": [{"name": "Python", "percentage": 100.0, "bytes": 910705}],
+        "git": {
+            "last_commit_at": "2026-08-20T16:12:10Z",
+            "commits_last_30d": 20,
+            "commits_30d_capped": False,
+            "open_issues": 0,
+            "open_pulls": 8,
+            "top_contributors": [{"login": "davidism", "contributions": 876}],
+        },
+        "files": {
+            "total_files": 156,
+            "total_bytes": 1592535,
+            "files_by_extension": {},
+            "largest_files": [
+                {"path": "src/click/core.py", "size_bytes": 147845, "lines": 3799}
+            ],
+            "line_counts": {},
+        },
+    }
+    text = "\n".join(render_digest_facts(annex, language="zh"))
+    assert "- 元数据：" in text
+    assert "17,633 星标" in text
+    assert "87 开放 issue（仓库元数据，含 PR）" in text
+    assert "- 语言：" in text
+    assert "910,705 字节" in text
+    assert "最近提交 2026-08-20T16:12:10Z" in text
+    assert "20 提交数（30 天）" in text
+    assert "开放 issue（issue 搜索，不含 PR）： 0" in text
+    assert "开放 PR： 8" in text
+    assert "主要贡献者： davidism (876)" in text
+    assert "- 文件：" in text
+    assert "156 个文件" in text
+    assert "1,592,535 字节" in text
+    # numbers, paths, and the B unit never translate
+    assert "src/click/core.py (147,845 B, 3,799 行)" in text
+    assert "Python 100.0%" in text

@@ -136,3 +136,70 @@ def test_empty_sections_render_gracefully() -> None:
     assert "None." in md  # unknowns section
     # empty sections collapse to nothing instead of empty tables
     assert "| Severity |" not in md
+
+
+# ---------------------------------------------------------------------------
+# Language localization (report["language"], set from REPORT_LANGUAGE)
+# ---------------------------------------------------------------------------
+
+
+def test_zh_render_uses_chinese_labels() -> None:
+    md = render_markdown({**REPORT, "language": "zh"})
+    assert "# 仓库分析报告: pallets/flask" in md
+    for heading in (
+        "## 概述", "## 技术栈", "## 仓库结构", "## 架构", "## 核心模块",
+        "## 入口点", "## 执行流程", "## 关键文件", "## 依赖", "## 风险",
+        "## 建议阅读顺序", "## 贡献机会", "## 未知项", "## 证据摘要",
+    ):
+        assert heading in md
+    assert "**摘要：**" in md
+    assert "| 类别 | 技术 | 作用 |" in md
+    assert "引用总数：" in md
+    assert "5/6 条引用已验证" in md
+    assert "**1 条未验证**" in md
+    assert "> 注意：本报告基于降级事实" in md
+
+
+def test_zh_verified_facts_keeps_english_anchor() -> None:
+    report = {
+        **REPORT,
+        "language": "zh",
+        "digest_facts": {
+            "metadata": {"stars": 71123, "forks": 10, "open_issues_count": 0},
+            "languages": [],
+            "git": {
+                "last_commit_at": None,
+                "commits_last_30d": 3,
+                "commits_30d_capped": False,
+                "open_issues": 0,
+                "open_pulls": 0,
+                "top_contributors": [],
+            },
+            "files": {
+                "total_files": 11,
+                "total_bytes": 1000,
+                "files_by_extension": {},
+                "largest_files": [],
+                "line_counts": {},
+            },
+        },
+    }
+    md = render_markdown(report)
+    assert "## 已验证事实 (Verified Facts, pipeline-computed)" in md
+    assert md.index("## 已验证事实 (Verified Facts, pipeline-computed)") < md.index("## 概述")
+    assert "71,123 星标" in md
+
+
+def test_zh_evidence_paths_never_translated() -> None:
+    md = render_markdown({**REPORT, "language": "zh"})
+    assert "`src/flask/app.py`" in md
+    assert "`does/not/exist.py`" in md
+    assert "证据：" in md
+
+
+def test_en_output_byte_identical_with_language_key() -> None:
+    assert render_markdown({**REPORT, "language": "en"}) == render_markdown(REPORT)
+
+
+def test_unknown_language_falls_back_to_en() -> None:
+    assert render_markdown({**REPORT, "language": "fr"}) == render_markdown(REPORT)

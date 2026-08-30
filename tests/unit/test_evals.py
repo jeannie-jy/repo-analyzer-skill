@@ -184,6 +184,8 @@ def test_judge_rubric_mentions_verified_facts_and_keeps_directly_support() -> No
     system = llm.calls[0][0]["content"]
     assert "Verified Facts" in system
     assert "directly support" in system
+    # zh reports judge the same: content language must not confuse the rubric
+    assert "English or Chinese" in system
 
 
 def test_judge_report_rejects_out_of_range_scores() -> None:

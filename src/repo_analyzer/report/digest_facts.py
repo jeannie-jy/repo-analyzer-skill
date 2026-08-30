@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import RepoFacts
+from .labels import label
 
 SECTION_TITLE = "Verified Facts (pipeline-computed)"
 
@@ -28,6 +29,13 @@ SECTION_TITLE = "Verified Facts (pipeline-computed)"
 # entry the LLM could restate, so the cap matches the extractor's, not
 # the digest's top-8 view).
 _LARGEST_FILES_CAP = 15
+
+
+def section_title(language: str = "en") -> str:
+    """The section title in ``language``; zh keeps the English anchor
+    ("Verified Facts") so the prompt contract and the judge rubric —
+    which both name the section — stay literally true under either."""
+    return label("section.verified_facts", language)
 
 
 def build_digest_facts(facts: RepoFacts) -> dict[str, Any]:
@@ -74,80 +82,85 @@ def build_digest_facts(facts: RepoFacts) -> dict[str, Any]:
     }
 
 
-def render_digest_facts(annex: dict[str, Any]) -> list[str]:
+def render_digest_facts(annex: dict[str, Any], language: str = "en") -> list[str]:
     """Markdown body lines for the Verified Facts section.
 
     The two issue counts are labeled by their endpoints and never merged:
     repo metadata counts PRs, the issues search does not (a repo can show
     87 vs 0 and be correct). ``(capped)`` marks a 30-day commit count that
-    hit the extraction cap.
+    hit the extraction cap. Numbers, ``?``, and the ``B`` unit render
+    identically under any language.
     """
     lines: list[str] = []
 
     meta = annex.get("metadata") or {}
     if meta:
         parts = [
-            f"{_num(meta.get('stars'))} stars",
-            f"{_num(meta.get('forks'))} forks",
-            f"{_num(meta.get('open_issues_count'))} open issues "
-            "(repo metadata, includes PRs)",
+            f"{_num(meta.get('stars'))} {label('digest.stars', language)}",
+            f"{_num(meta.get('forks'))} {label('digest.forks', language)}",
+            f"{_num(meta.get('open_issues_count'))} "
+            f"{label('digest.open_issues_meta', language)}",
         ]
-        lines.append(f"- metadata: {' | '.join(parts)}")
+        lines.append(f"- {label('digest.metadata', language)} {' | '.join(parts)}")
 
     languages = annex.get("languages")
     if languages:
         langs = "; ".join(
             f"{lang['name']} {lang['percentage']:.1f}% "
-            f"({_num(lang.get('bytes'))} bytes)"
+            f"({_num(lang.get('bytes'))} {label('digest.bytes', language)})"
             for lang in languages
         )
-        lines.append(f"- languages: {langs}")
+        lines.append(f"- {label('digest.languages', language)} {langs}")
 
     git = annex.get("git") or {}
     if git:
         parts: list[str] = []
         if git.get("last_commit_at"):
-            parts.append(f"last commit {git['last_commit_at']}")
+            parts.append(f"{label('digest.last_commit', language)} {git['last_commit_at']}")
         commits = git.get("commits_last_30d")
         if commits is not None:
-            capped = " (capped)" if git.get("commits_30d_capped") else ""
-            parts.append(f"{_num(commits)} commits (30d){capped}")
+            capped = (
+                f" {label('digest.capped', language)}"
+                if git.get("commits_30d_capped")
+                else ""
+            )
+            parts.append(f"{_num(commits)} {label('digest.commits_30d', language)}{capped}")
         parts.append(
-            "open issues (issues search, excludes PRs): "
+            f"{label('digest.open_issues_search', language)} "
             f"{_num(git.get('open_issues'))}"
         )
         if git.get("open_pulls") is not None:
-            parts.append(f"open PRs: {_num(git['open_pulls'])}")
+            parts.append(f"{label('digest.open_prs', language)} {_num(git['open_pulls'])}")
         top = git.get("top_contributors")
         if top:
             names = ", ".join(
                 f"{c['login']} ({_num(c.get('contributions'))})" for c in top
             )
-            parts.append(f"top contributors: {names}")
-        lines.append(f"- git: {' | '.join(parts)}")
+            parts.append(f"{label('digest.top_contributors', language)} {names}")
+        lines.append(f"- {label('digest.git', language)} {' | '.join(parts)}")
 
     files = annex.get("files") or {}
     if files:
         parts = []
         if files.get("total_files") is not None:
-            parts.append(f"{_num(files['total_files'])} files")
+            parts.append(f"{_num(files['total_files'])} {label('digest.files_count', language)}")
         if files.get("total_bytes") is not None:
-            parts.append(f"{_num(files['total_bytes'])} bytes")
+            parts.append(f"{_num(files['total_bytes'])} {label('digest.bytes', language)}")
         largest = files.get("largest_files")
         if largest:
             entries = []
             for entry in largest:
-                size = f"{_num(entry.get('size_bytes'))} B"
+                size = f"{_num(entry.get('size_bytes'))} {label('digest.bytes_unit', language)}"
                 lines_count = entry.get("lines")
                 if lines_count is not None:
                     entries.append(
                         f"{entry.get('path', '?')} ({size}, "
-                        f"{_num(lines_count)} lines)"
+                        f"{_num(lines_count)} {label('digest.lines', language)})"
                     )
                 else:
                     entries.append(f"{entry.get('path', '?')} ({size})")
-            parts.append("largest: " + ", ".join(entries))
-        lines.append(f"- files: {' | '.join(parts)}")
+            parts.append(f"{label('digest.largest', language)} " + ", ".join(entries))
+        lines.append(f"- {label('digest.files', language)} {' | '.join(parts)}")
 
     return lines
 

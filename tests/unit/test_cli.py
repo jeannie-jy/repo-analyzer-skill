@@ -128,7 +128,9 @@ def _noop_raw(_ref, _branch, _path) -> str:
     return "line1\nline2\n"
 
 
-def _patch_settings(monkeypatch, server_url: str, tmp_path: Path, *, api_key: str = "sk-test") -> Settings:
+def _patch_settings(
+    monkeypatch, server_url: str, tmp_path: Path, *, api_key: str = "sk-test", report_language: str = "en"
+) -> Settings:
     settings = Settings(
         github_api_url=server_url,
         llm_base_url=f"{server_url}/v1",
@@ -136,6 +138,7 @@ def _patch_settings(monkeypatch, server_url: str, tmp_path: Path, *, api_key: st
         llm_model="fake-model",
         output_dir=str(tmp_path),
         token_budget=40_000,
+        report_language=report_language,
     )
     monkeypatch.setattr(Settings, "from_env", lambda: settings)
     monkeypatch.setattr("repo_analyzer.extract.file_stats._fetch_raw", _noop_raw)
@@ -186,6 +189,21 @@ def test_analyze_full_pipeline_writes_all_artifacts(tmp_path, server, monkeypatc
     report = json.loads((workdir / REPORT_FILENAME).read_text(encoding="utf-8"))
     assert report["analysis"]["overview"]["summary"]
     assert report["evidence_summary"]["unverified"] == 0
+
+
+def test_analyze_passes_report_language(tmp_path, server, monkeypatch, capsys) -> None:
+    # REPORT_LANGUAGE=zh flows settings -> cli -> pipeline -> render:
+    # report.json records it and report.md renders zh labels.
+    _patch_settings(monkeypatch, server, tmp_path, report_language="zh")
+    code = main(["analyze", str(REF.url)])
+    assert code == 0
+
+    workdir = tmp_path / "repos" / "pallets" / "flask"
+    report = json.loads((workdir / REPORT_FILENAME).read_text(encoding="utf-8"))
+    assert report["language"] == "zh"
+    md = (workdir / REPORT_MD_FILENAME).read_text(encoding="utf-8")
+    assert "# 仓库分析报告: pallets/flask" in md
+    assert "## 概述" in md
 
 
 def test_sample_code_command_lists_files(tmp_path, server, monkeypatch, capsys) -> None:
