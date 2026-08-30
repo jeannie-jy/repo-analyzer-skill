@@ -1,0 +1,5 @@
+{
+  "url": "https://github.com/11ty/eleventy",
+  "ref": "main",
+  "note": "Pinned ref keeps every eval run reproducible; facts are cached under the output dir."
+}

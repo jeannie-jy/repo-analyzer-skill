@@ -146,18 +146,60 @@ A/B under the SAME new rubric: the pre-annex flask report
 the judge now catches against the annex's ground truth in the new
 report. The exemption is the annex, not a looser rubric.
 
+## Results (2026-08-30) — two new gold cases: Rust + Node
+
+Roadmap item 4 (more gold cases) landed two new cases: `sharkdp/fd`
+(Rust crate, `[[bin]] name = "fd" path = "src/main.rs"`) and
+`11ty/eleventy` (Node SSG, `package.json` bin `{"eleventy":
+"cmd.cjs"}`). Both cases pin live refs (`master` / `main`); the
+deterministic metrics were measured from fresh pinned-ref facts, and
+judge scores are N=3 medians.
+
+| Case | Type | Structure | Entrypoint P/R/F1 | Grounding | Halluc. | Judge (c/g/c/a, useful) |
+|---|---|---|---|---|---|---|
+| sharkdp/fd | small Rust CLI | 9/9 (100%) | 0.00 / 0.00 / **0.00** | 16/16 | **0%** | 5/5/5/5, 5 |
+| 11ty/eleventy | medium Node SSG | 9/9 (100%) | 1.00 / 1.00 / **1.00** | 12/12 | **0%** | 5/4/4/5, 5 |
+
+fd's 0.00 is the Cargo blind spot, now documented and measurable: the
+extractor has no Cargo.toml `[[bin]]` detection, so the Makefile
+`build_entry` candidate (conf 0.6) is a false positive and `src/main.rs`
+is a false negative. This is the click-2026-08-22 pattern: the case
+ships with the limitation recorded and becomes the regression guard for
+the fix (a Cargo bin heuristic should raise F1 to 1.00). eleventy is the
+positive control: the existing package.json bin heuristic hits `cmd.cjs`
+at conf 0.95, F1 = 1.00, and the three older cases are unchanged
+(regression guard held).
+
+The eleventy run also surfaced and closed an annex coverage gap: the
+digest's largest-files view capped at 8 (test files dominated eleventy's
+top 8), but the sampler sends every non-test largest file's byte count
+to the LLM via the sample reason — the report restated
+`src/UserConfig.js` (36,739 B) and `src/Template.js` (31,836 B), which
+the annex did not list, and the judge deducted exactly those under the
+rubric's "a number the section does not list" rule. The numbers were
+correct (matching the tree exactly) — the annex, not the report, was
+incomplete. Fix: `_LARGEST_FILES_CAP` now matches the extractor's 15
+(`RepoFacts.from_dict` added for rebuilding the annex from a fact base
+on disk; both unit-tested). Re-judged after the fix: fd grounding 4 → 5,
+eleventy grounding 3 → 4 and usefulness 4 → 5; the byte-size deductions
+are gone from the judge's comments, leaving only scope-legal deductions
+(eleventy's "implied"/"likely" TemplateWriter/Core.js inferences).
+
 ## Reading the numbers
 
-1. **Structure extraction is exact (28/28 gold paths).** The tree is
+1. **Structure extraction is exact (46/46 gold paths).** The tree is
    deterministic API data — this metric is a guard against regressions,
-   not a real risk, and it holds.
+   not a real risk, and it holds across all five cases (gum 8, flask 10,
+   click 10, fd 9, eleventy 9).
 
 2. **Entrypoint F1 tracks repository shape, as designed.** The heuristics
    are deliberately greedy (high recall): flask recalls all three real
    entries (R=1.0) at the cost of three expected false positives
    (`sansio/app.py` base class, two `tests/test_apps` apps). The LLM
    phase re-ranks and drops those — the eval case note says so. Gum is
-   the best-case shape (single-entry CLI) at F1=1.0. Click's library
+   the best-case shape (single-entry CLI) at F1=1.0, eleventy (single
+   Node CLI via package.json bin) matches at F1=1.0, and fd is the
+   documented Cargo blind spot at F1=0.00 (see the 08-30 section). Click's library
    blind spot (F1 was 0.00 — no console scripts, no `__main__`, no
    server) is closed by the library-package-root heuristic: when no
    `cli`/`http_server` candidate exists, the strongest package root
@@ -196,10 +238,20 @@ report. The exemption is the annex, not a looser rubric.
 - Judge scores are single-model (deepseek-v4-flash) with high run
   variance: the same report scored grounding 3 and 5 across runs.
   Medians over N=4-6 are reported, but the spread is wider than the
-  prompt effects measured so far.
-- All three cases now have reports; grounding is verified for all of
-  them (flask 16/16, click 15/15, gum 18/18 on the 08-27 snapshot —
-  0% hallucination each).
+  prompt effects measured so far (eleventy scored a3 in one run and
+  a5 in two).
+- All five cases now have reports; grounding is verified for all of
+  them (flask 16/16, click 15/15, gum 18/18 on the 08-27 snapshot,
+  fd 16/16 and eleventy 12/12 on the 08-30 snapshot — 0%
+  hallucination each).
+- fd's entrypoint F1 is 0.00 by design (no Cargo.toml `[[bin]]`
+  detection yet); the case exists to make the blind spot measurable
+  and to guard the future heuristic. eleventy's judge grounding 4 is
+  the report's honest "implied"/"likely" inferences — the LLM flagged
+  what it could not verify, and the judge correctly deducts for it.
+- The annex covers the sampler's largest-file tier (15); a number the
+  extractor never computes cannot be listed, so any future digest
+  field needs its annex entry added with it.
 - `eval` re-extracts every case on every invocation, so a full
   `--judge` run costs roughly 15 GitHub API requests per case and a
   tokenless budget (60 req/hr per IP) cannot hold repeated judge runs —

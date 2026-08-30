@@ -1,0 +1,17 @@
+{
+  "entrypoints": [
+    {"path": "cmd.cjs", "kind": "cli", "note": "package.json bin: {\"eleventy\": \"cmd.cjs\"} — the npm-installed 'eleventy' command. The user-facing entry."}
+  ],
+  "expected_paths": [
+    "package.json",
+    "cmd.cjs",
+    "src/Core.js",
+    "src/UserConfig.js",
+    "src/Template.js",
+    "README.md",
+    "test",
+    "docs",
+    "packages"
+  ],
+  "note": "Node SSG case: single user-facing entry, the package.json bin mapping to cmd.cjs (the existing package.json bin heuristic should hit it at high confidence). src/Core.js is the library core invoked by cmd.cjs, not a separate user entry. packages/ is a workspace (browser, build-awesome) — build/test tooling, not entry points."
+}

@@ -128,5 +128,89 @@
       "usefulness": 5,
       "comments": "The report is exceptionally thorough: it covers purpose, architecture, entry points, dependencies, risks, and contribution paths with a clear reading order. Grounding is strong��all 16 citations verify against the tree, and the report explicitly flags anything not directly sampled in an Unknowns section, so unsupported claims are avoided. Technical details (request lifecycle, sansio separation, CLI discovery, ctx compat shim) match known Flask internals and the pipeline-computed facts are used co"
     }
+  },
+  {
+    "case": "sharkdp-fd",
+    "repo": {
+      "url": "https://github.com/sharkdp/fd",
+      "ref": "master"
+    },
+    "structure": {
+      "expected": 9,
+      "hits": 9,
+      "misses": 0,
+      "accuracy": 1.0,
+      "missing_paths": []
+    },
+    "entrypoints": {
+      "gold_count": 1,
+      "predicted_count": 1,
+      "true_positives": [],
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "false_negatives": [
+        "src/main.rs"
+      ],
+      "false_positives": [
+        "Makefile"
+      ]
+    },
+    "grounding": {
+      "total_citations": 16,
+      "verified": 16,
+      "unverified": 0,
+      "hallucination_rate": 0.0,
+      "unverified_list": []
+    },
+    "judge": {
+      "coverage": 5,
+      "grounding": 5,
+      "correctness": 5,
+      "actionability": 5,
+      "usefulness": 5,
+      "comments": "All 5/5/5/5/5 (N=3 medians). Judge approves the annex: \"all pipeline-computed numbers in Verified Facts are used accurately\"; inferred details are flagged in Unknowns."
+    }
+  },
+  {
+    "case": "11ty-eleventy",
+    "repo": {
+      "url": "https://github.com/11ty/eleventy",
+      "ref": "main"
+    },
+    "structure": {
+      "expected": 9,
+      "hits": 9,
+      "misses": 0,
+      "accuracy": 1.0,
+      "missing_paths": []
+    },
+    "entrypoints": {
+      "gold_count": 1,
+      "predicted_count": 1,
+      "true_positives": [
+        "cmd.cjs"
+      ],
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_negatives": [],
+      "false_positives": []
+    },
+    "grounding": {
+      "total_citations": 12,
+      "verified": 12,
+      "unverified": 0,
+      "hallucination_rate": 0.0,
+      "unverified_list": []
+    },
+    "judge": {
+      "coverage": 5,
+      "grounding": 4,
+      "correctness": 4,
+      "actionability": 5,
+      "usefulness": 5,
+      "comments": "N=3 medians. Remaining grounding deductions are scope-legal inferences: TemplateWriter internals and Core.js behavior marked \"implied\"/\"likely\" in the report; the byte-size deductions are gone after the annex largest-files cap matched the sampler tier (15)."
+    }
   }
 ]

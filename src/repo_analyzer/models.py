@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import asdict, dataclass, field
+import typing
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 
 from .errors import InputError
@@ -255,3 +256,37 @@ class RepoFacts:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RepoFacts":
+        """Rebuild facts from a serialized dict (the ``to_dict`` inverse).
+
+        Nested dataclasses and dataclass lists are reconstructed from
+        their field types; unknown keys are ignored so older fact bases
+        keep loading. Used by tools that need a ``RepoFacts`` object
+        from a fact base on disk (e.g. rebuilding the digest annex).
+        """
+        type_map = typing.get_type_hints(cls)
+        kwargs: dict = {}
+        for name, value in data.items():
+            if name not in type_map:
+                continue
+            kwargs[name] = _rebuild_nested(type_map[name], value)
+        return cls(**kwargs)
+
+
+def _rebuild_nested(typ: Any, value: Any) -> Any:
+    """Reconstruct one value against a dataclass field type annotation."""
+    origin = typing.get_origin(typ)
+    if origin is list:
+        (item_type,) = typing.get_args(typ)
+        return [_rebuild_nested(item_type, v) for v in value]
+    if isinstance(typ, type) and is_dataclass(typ):
+        type_map = typing.get_type_hints(typ)
+        kwargs = {
+            f.name: _rebuild_nested(type_map[f.name], value[f.name])
+            for f in fields(typ)
+            if f.name in value
+        }
+        return typ(**kwargs)
+    return value

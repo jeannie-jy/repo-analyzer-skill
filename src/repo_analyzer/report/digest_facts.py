@@ -22,8 +22,12 @@ from ..models import RepoFacts
 
 SECTION_TITLE = "Verified Facts (pipeline-computed)"
 
-# Matches the digest's largest-files view (prompts.render_facts_digest).
-_LARGEST_FILES_CAP = 8
+# Covers the sampler's largest-file tier (extract.file_stats caps at 15;
+# the sampler skips tests/vendored and sends each remaining entry's byte
+# count to the LLM via the sample reason — the annex must list every
+# entry the LLM could restate, so the cap matches the extractor's, not
+# the digest's top-8 view).
+_LARGEST_FILES_CAP = 15
 
 
 def build_digest_facts(facts: RepoFacts) -> dict[str, Any]:

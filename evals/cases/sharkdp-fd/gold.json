@@ -1,0 +1,17 @@
+{
+  "entrypoints": [
+    {"path": "src/main.rs", "kind": "cli", "note": "Cargo [[bin]] target: name \"fd\", path \"src/main.rs\" (Cargo.toml). The fd CLI binary."}
+  ],
+  "expected_paths": [
+    "Cargo.toml",
+    "src/main.rs",
+    "src/cli.rs",
+    "src/walk.rs",
+    "src/output.rs",
+    "Makefile",
+    "README.md",
+    "doc",
+    "tests"
+  ],
+  "note": "Rust crate case: the real entry is the Cargo [[bin]] target, NOT the Makefile (build/CI helper only). The extractor has no Cargo.toml bin detection, so this case documents the blind spot — expected F1 < 1.00 (the Makefile build_entry candidate at conf 0.6 is a false positive; src/main.rs is a false negative). A Cargo bin heuristic should raise F1 to 1.00; this case guards that fix."
+}

@@ -51,6 +51,31 @@ def test_build_annex_joins_line_counts_into_largest_files() -> None:
     assert by_path["b.py"]["lines"] is None
 
 
+def test_annex_lists_all_extractor_largest_files() -> None:
+    # The sampler sends every non-test largest file's byte count to the
+    # LLM via the sample reason; the annex must cover all of them (the
+    # extractor caps at 15), or the judge deducts a number it can see in
+    # the report but not in the annex.
+    files = [
+        FileSize(f"f{i}.py", 1000 - i)
+        for i in range(20)
+    ]
+    facts = RepoFacts(files=FileStats(total_files=20, total_bytes=20000, largest_files=files))
+    annex = build_digest_facts(facts)
+    assert len(annex["files"]["largest_files"]) == 15
+    rendered = "\n".join(render_digest_facts(annex))
+    assert "f14.py" in rendered  # last extractor entry is covered
+    assert "f15.py" not in rendered  # extractor never emits beyond 15
+
+
+def test_facts_round_trip_via_from_dict(tmp_path) -> None:
+    facts = extract_facts(
+        _full_client(), REF, output_dir=tmp_path, fetch_raw_fn=_noop_raw
+    )
+    rebuilt = RepoFacts.from_dict(facts.to_dict())
+    assert rebuilt.to_dict() == facts.to_dict()
+
+
 def test_build_annex_handles_empty_facts() -> None:
     annex = build_digest_facts(RepoFacts())
     assert annex["metadata"]["stars"] == 0
