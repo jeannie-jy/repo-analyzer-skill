@@ -297,6 +297,16 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
                   f"| usefulness {j['usefulness']}")
             if j["comments"]:
                 print(f"    comments:  {j['comments'][:200]}")
+            sections = j.get("sections") or []
+            if sections:
+                weak = [s["name"] for s in sections
+                        if s["grounding"] <= 2 or s["correctness"] <= 2]
+                avg_g = sum(s["grounding"] for s in sections) / len(sections)
+                avg_c = sum(s["correctness"] for s in sections) / len(sections)
+                print(f"  sections:   {len(sections)} scored "
+                      f"(avg grounding {avg_g:.1f}, avg correctness {avg_c:.1f})")
+                if weak:
+                    print(f"    weak:      {', '.join(weak)}")
     return 0
 
 

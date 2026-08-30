@@ -15,7 +15,11 @@ judge metrics cost one LLM call per analyzed report.
   the output dir; grounding reuses the existing `report.json`.
 - **Judge**: `--judge` scores existing reports with an LLM-as-judge
   (deepseek-v4-flash) on a 1-5 rubric: coverage, grounding,
-  correctness, actionability, plus overall usefulness.
+  correctness, actionability, plus overall usefulness. Since
+  2026-08-30 the rubric also scores every content section of the
+  report (grounding + correctness each) and returns them as a
+  `sections` array ahead of the overall scores; parsing is lenient, so
+  older judge output without `sections` still parses (Roadmap item 6).
 - **Reproduce**: `repo-analyzer eval --output-dir output --judge`
   (full results in `baseline.json`).
 

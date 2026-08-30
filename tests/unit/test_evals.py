@@ -156,10 +156,13 @@ def test_judge_report_parses_scores() -> None:
     assert scores["coverage"] == 4
     assert scores["usefulness"] == 4
     assert scores["comments"] == "solid"
+    # old-rubric output (no sections array) parses with sections == []
+    assert scores["sections"] == []
     # the judge saw the report and the rubric in its messages
     system = llm.calls[0][0]["content"]
     assert "coverage" in system and "usefulness" in system
     assert "directly support" in system
+    assert "Per-section scores" in system
     assert "# Report" in llm.calls[0][1]["content"]
 
 
@@ -193,3 +196,67 @@ def test_judge_report_rejects_out_of_range_scores() -> None:
                                "actionability": 5, "usefulness": 5})])
     with pytest.raises(InputError, match="coverage"):
         judge_report(llm, "report", "x/y", "https://github.com/x/y")
+
+
+def test_judge_report_parses_sections() -> None:
+    llm = FakeLLM(
+        [
+            json.dumps(
+                {
+                    "sections": [
+                        {"name": "Overview", "grounding": 5, "correctness": 4,
+                         "comments": "well supported"},
+                        {"name": "Risks", "grounding": 2, "correctness": 3,
+                         "comments": "thin"},
+                    ],
+                    "coverage": 4,
+                    "grounding": 5,
+                    "correctness": 3,
+                    "actionability": 2,
+                    "usefulness": 4,
+                    "comments": "solid",
+                }
+            )
+        ]
+    )
+    scores = judge_report(llm, "# Report\nfake", "x/y", "https://github.com/x/y")
+    assert scores["sections"] == [
+        {"name": "Overview", "grounding": 5, "correctness": 4,
+         "comments": "well supported"},
+        {"name": "Risks", "grounding": 2, "correctness": 3, "comments": "thin"},
+    ]
+    # flat five still parse alongside the per-section array
+    assert scores["coverage"] == 4 and scores["usefulness"] == 4
+
+
+def test_judge_report_sections_lenient() -> None:
+    """Malformed sections entries drop silently; overall scores survive."""
+    llm = FakeLLM(
+        [
+            json.dumps(
+                {
+                    "sections": [
+                        "not a dict",
+                        {"name": "", "grounding": 5, "correctness": 5},
+                        {"name": 42, "grounding": 5, "correctness": 5},
+                        {"name": "No scores"},
+                        {"name": "Bad range", "grounding": 9, "correctness": 0},
+                        {"name": "Good", "grounding": 4.0, "correctness": 3},
+                        {"name": "Missing comments", "grounding": 5, "correctness": 5},
+                    ],
+                    "coverage": 4,
+                    "grounding": 5,
+                    "correctness": 3,
+                    "actionability": 2,
+                    "usefulness": 4,
+                }
+            )
+        ]
+    )
+    scores = judge_report(llm, "report", "x/y", "https://github.com/x/y")
+    assert [s["name"] for s in scores["sections"]] == [
+        "Good", "Missing comments"]
+    assert scores["sections"][0]["grounding"] == 4
+    assert scores["sections"][0]["correctness"] == 3
+    assert scores["sections"][1]["comments"] == ""
+    assert scores["coverage"] == 4  # overall scores not affected

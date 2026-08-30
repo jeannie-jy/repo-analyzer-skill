@@ -62,8 +62,20 @@ report on four criteria and overall usefulness, each 1-5 (5 = best):
 - usefulness: overall, how well does this report equip a newcomer to
   understand and contribute to the codebase?
 
-Return ONLY a JSON object, no commentary:
-{"coverage": 1-5, "grounding": 1-5, "correctness": 1-5,
+Per-section scores: additionally score EVERY content section of the
+report (Overview, Tech Stack, Repository Structure, Architecture,
+Core Modules, Entry Points, Execution Flow, Key Files, Dependencies,
+Risks, Suggested Reading Order, Contribution Opportunities, Unknowns —
+as named in the report, in its language) on two criteria:
+- grounding: are the section's claims tied to evidence paths whose
+  content directly supports them (same directness rule as above)?
+- correctness: are the section's technical claims accurate?
+
+Return ONLY a JSON object, no commentary, with the per-section array
+first and the overall scores after:
+{"sections": [{"name": "<section name as in the report>",
+  "grounding": 1-5, "correctness": 1-5, "comments": "..."}, ...],
+ "coverage": 1-5, "grounding": 1-5, "correctness": 1-5,
  "actionability": 1-5, "usefulness": 1-5, "comments": "..."}
 """
 
@@ -188,7 +200,41 @@ def judge_report(llm: LLMClient, report_md: str, case_name: str, url: str) -> di
             raise InputError(f"Judge returned invalid {key}={value!r}")
         scored[key] = int(value)
     scored["comments"] = str(parsed.get("comments", ""))[:500]
+    # Per-section scores are optional: the overall five criteria stay the
+    # hard contract (old rubric output parses identically). Malformed
+    # entries are dropped rather than failing the whole run.
+    scored["sections"] = _parse_judge_sections(parsed.get("sections"))
     return scored
+
+
+def _parse_judge_sections(raw: object) -> list[dict]:
+    """Validate the judge's per-section array, leniently.
+
+    A missing/malformed array yields [] (overall scores still valid);
+    individual entries that lack a name or a valid 1-5 score are dropped.
+    """
+    if not isinstance(raw, list):
+        return []
+    sections: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            continue
+        grounding = item.get("grounding")
+        correctness = item.get("correctness")
+        def _valid(value: object) -> bool:
+            return isinstance(value, (int, float)) and 1 <= value <= 5
+        if not _valid(grounding) or not _valid(correctness):
+            continue
+        sections.append({
+            "name": name.strip(),
+            "grounding": int(grounding),
+            "correctness": int(correctness),
+            "comments": str(item.get("comments", ""))[:300],
+        })
+    return sections
 
 
 def run_case(
