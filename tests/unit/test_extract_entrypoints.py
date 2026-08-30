@@ -61,6 +61,144 @@ def test_package_json_start_script_is_http_server_candidate() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cargo.toml ([[bin]] + default bin/lib conventions)
+# ---------------------------------------------------------------------------
+
+
+def test_cargo_bin_target_in_tree() -> None:
+    content = (
+        '[package]\nname = "fd-find"\n'
+        '[[bin]]\nname = "fd"\npath = "src/main.rs"\n'
+    )
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    candidates = extract_entrypoints(
+        client, REF, "main", _tree_with("Cargo.toml", "src/main.rs")
+    )
+    cli = _candidates_of_kind(candidates, "cli")
+    fd = [c for c in cli if "fd" in (c.invocation or "")]
+    assert len(fd) == 1
+    assert fd[0].path == "src/main.rs"
+    assert fd[0].confidence == 0.95
+    assert fd[0].invocation == "cargo run --bin fd"
+    assert "Cargo [[bin]] 'fd'" in (fd[0].heuristic or "")
+
+
+def test_cargo_bin_path_missing_from_tree_is_weaker() -> None:
+    content = '[[bin]]\nname = "fd"\npath = "src/main.rs"\n'
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    candidates = extract_entrypoints(
+        client, REF, "main", _tree_with("Cargo.toml")
+    )
+    cli = _candidates_of_kind(candidates, "cli")
+    assert any(c.path == "Cargo.toml" and c.confidence == 0.85 for c in cli)
+
+
+def test_cargo_default_bin_convention() -> None:
+    # No [[bin]] table: Cargo still treats src/main.rs as the bin.
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response('[package]\nname = "fd-find"\n', "Cargo.toml"),
+    )
+    candidates = extract_entrypoints(
+        client, REF, "main", _tree_with("Cargo.toml", "src/main.rs")
+    )
+    cli = _candidates_of_kind(candidates, "cli")
+    assert any(
+        c.path == "src/main.rs"
+        and c.confidence == 0.90
+        and "default bin" in (c.heuristic or "")
+        for c in cli
+    )
+
+
+def test_cargo_workspace_member_bin_detected() -> None:
+    content = '[[bin]]\nname = "member-bin"\npath = "src/main.rs"\n'
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/crates/member/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    tree = _tree_with(
+        "Cargo.toml",
+        "crates/member/Cargo.toml",
+        "crates/member/src/main.rs",
+    )
+    candidates = extract_entrypoints(client, REF, "main", tree)
+    cli = _candidates_of_kind(candidates, "cli")
+    assert any(
+        c.path == "crates/member/src/main.rs"
+        and c.invocation == "cargo run --bin member-bin"
+        for c in cli
+    )
+
+
+def test_cargo_default_lib_target() -> None:
+    content = '[package]\nname = "serde-utils"\n'
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    candidates = extract_entrypoints(
+        client, REF, "main", _tree_with("Cargo.toml", "src/lib.rs")
+    )
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/lib.rs"
+    assert lib[0].confidence == 0.70
+    assert lib[0].invocation == "use serde-utils"
+
+
+def test_cargo_explicit_lib_path() -> None:
+    content = '[lib]\nname = "core"\npath = "src/engine/lib.rs"\n'
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    candidates = extract_entrypoints(
+        client, REF, "main", _tree_with("Cargo.toml", "src/engine/lib.rs")
+    )
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/engine/lib.rs"
+    assert "Cargo [lib] path" in (lib[0].heuristic or "")
+
+
+def test_cargo_lib_suppressed_when_bin_exists() -> None:
+    # A crate with both bin and lib: the lib is the bin's internals,
+    # not a separate user entry — same gate as the Python library root.
+    content = (
+        '[package]\nname = "app"\n'
+        '[[bin]]\nname = "app"\npath = "src/main.rs"\n'
+    )
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response(content, "Cargo.toml"),
+    )
+    tree = _tree_with("Cargo.toml", "src/main.rs", "src/lib.rs")
+    candidates = extract_entrypoints(client, REF, "main", tree)
+    assert _candidates_of_kind(candidates, "cli")
+    assert not _candidates_of_kind(candidates, "library_api")
+
+
+def test_cargo_lib_not_suppressed_by_makefile() -> None:
+    # Build/CI artifacts must not suppress a library import surface.
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Cargo.toml",
+        contents_response('[package]\nname = "libcrate"\n', "Cargo.toml"),
+    )
+    tree = _tree_with("Cargo.toml", "src/lib.rs", "Makefile")
+    candidates = extract_entrypoints(client, REF, "main", tree)
+    lib = _candidates_of_kind(candidates, "library_api")
+    assert len(lib) == 1
+    assert lib[0].path == "src/lib.rs"
+
+
+# ---------------------------------------------------------------------------
 # pyproject.toml
 # ---------------------------------------------------------------------------
 
@@ -102,6 +240,20 @@ def test_makefile_with_dev_targets() -> None:
     )
     candidates = extract_entrypoints(client, REF, "main", _tree_with("Makefile"))
     assert any(c.kind == "build_entry" for c in candidates)
+
+
+def test_makefile_phony_completions_not_an_entry() -> None:
+    # A .PHONY that names only build artifacts (e.g. `completions`) is a
+    # packaging target, not a run/dev entry — must not become a candidate.
+    client = FakeClient().route(
+        "repos/pallets/flask/contents/Makefile",
+        contents_response(
+            ".PHONY: completions archive\ncompletions:\n\t./exe --gen-completions\n",
+            "Makefile",
+        ),
+    )
+    candidates = extract_entrypoints(client, REF, "main", _tree_with("Makefile"))
+    assert not _candidates_of_kind(candidates, "build_entry")
 
 
 # ---------------------------------------------------------------------------

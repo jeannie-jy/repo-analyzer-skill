@@ -31,10 +31,15 @@ _FILE_RULES: tuple[tuple[str, str, float, str], ...] = (
     ("**/main.go", "entrypoint_script", 0.55, "Go main package"),
     ("Dockerfile", "container_entry", 0.50, "Dockerfile present"),
     ("**/Dockerfile", "container_entry", 0.50, "Dockerfile present"),
-    ("Makefile", "build_entry", 0.50, "Makefile present"),
+    # Makefile is intentionally absent: presence alone says nothing about
+    # being an entry — only a run/dev/serve/test target does (rule below).
 )
 
-_MAKEFILE_TARGET = re.compile(r"^(\.PHONY|run|start|dev|serve|test):", re.M)
+_MAKEFILE_TARGET = re.compile(
+    r"^(?:run|start|dev|serve|test)\s*:"
+    r"|^\.PHONY\s*:\s*(?=[^#]*\b(?:run|start|dev|serve|test)\b)",
+    re.M,
+)
 _DOCKERFILE_ENTRY = re.compile(r"^(CMD|ENTRYPOINT)\s+(.+)$", re.M)
 
 # --- library package root: the import surface is the entry ------------------
@@ -148,7 +153,79 @@ def extract_entrypoints(
                     )
                 )
 
-    # 3. pyproject.toml: [project].scripts ------------------------------------
+    # 3. Cargo.toml: [[bin]] targets + the default bin convention ------------
+    #    Every Cargo.toml in the tree is parsed (workspace member crates
+    #    declare their own bins); lib targets are collected for the gate at
+    #    the end — a crate's lib is its internals when a runnable bin exists.
+    cargo_lib_candidates: list[EntrypointCandidate] = []
+    for manifest_path in sorted(p for p in paths if p.endswith("Cargo.toml")):
+        content = fetch_file_content(client, ref, branch, manifest_path)
+        if content is None:
+            continue
+        try:
+            cargo = tomllib.loads(content)
+        except tomllib.TOMLDecodeError:
+            cargo = {}
+        bins = cargo.get("bin")
+        declared_bins = isinstance(bins, list) and bool(bins)
+        if declared_bins:
+            manifest_dir = manifest_path.rsplit("/", 1)[0] if "/" in manifest_path else ""
+            for target in bins:
+                if not isinstance(target, dict):
+                    continue
+                name = target.get("name")
+                bin_path = target.get("path") or "src/main.rs"
+                # [[bin]].path is relative to the manifest's directory.
+                full_path = f"{manifest_dir}/{bin_path}" if manifest_dir else bin_path
+                in_tree = full_path in paths
+                add(
+                    EntrypointCandidate(
+                        path=full_path if in_tree else manifest_path,
+                        kind="cli",
+                        heuristic=f"Cargo [[bin]] '{name}'"
+                        if name else "Cargo [[bin]] target",
+                        confidence=0.95 if in_tree else 0.85,
+                        invocation=f"cargo run --bin {name}"
+                        if name else "cargo run",
+                    )
+                )
+        elif "src/main.rs" in paths:
+            # Cargo treats src/main.rs as the bin even with no [[bin]] table.
+            add(
+                EntrypointCandidate(
+                    path="src/main.rs",
+                    kind="cli",
+                    heuristic="Cargo default bin target (src/main.rs)",
+                    confidence=0.90,
+                    invocation="cargo run",
+                )
+            )
+        lib = cargo.get("lib")
+        lib_path: str | None = None
+        if isinstance(lib, dict) and isinstance(lib.get("path"), str):
+            lib_path = lib["path"]
+        elif "src/lib.rs" in paths and manifest_path == "Cargo.toml":
+            # Default lib convention; only the root crate's lib surface is
+            # a user entry (workspace members are internals of the build).
+            lib_path = "src/lib.rs"
+        if lib_path is not None:
+            in_tree = lib_path in paths
+            pkg_name = (cargo.get("package") or {}).get("name")
+            cargo_lib_candidates.append(
+                EntrypointCandidate(
+                    path=lib_path if in_tree else manifest_path,
+                    kind="library_api",
+                    heuristic="Cargo [lib] path"
+                    if isinstance(lib, dict) and lib.get("path")
+                    else "Cargo default lib target (src/lib.rs)",
+                    confidence=0.70 if in_tree else 0.60,
+                    invocation=f"use {pkg_name}"
+                    if isinstance(pkg_name, str)
+                    else "use <crate_name>",
+                )
+            )
+
+    # 4. pyproject.toml: [project].scripts ------------------------------------
     pyproject_content = fetch_file_content(client, ref, branch, "pyproject.toml")
     if pyproject_content is not None:
         try:
@@ -167,7 +244,7 @@ def extract_entrypoints(
                 )
             )
 
-    # 4. Dockerfile: CMD / ENTRYPOINT -----------------------------------------
+    # 5. Dockerfile: CMD / ENTRYPOINT -----------------------------------------
     dockerfile = fetch_file_content(client, ref, branch, "Dockerfile")
     if dockerfile is not None:
         for match in _DOCKERFILE_ENTRY.finditer(dockerfile):
@@ -181,7 +258,7 @@ def extract_entrypoints(
                 )
             )
 
-    # 5. Makefile: dev/build targets -------------------------------------------
+    # 6. Makefile: dev/build targets -------------------------------------------
     makefile = fetch_file_content(client, ref, branch, "Makefile")
     if makefile is not None and _MAKEFILE_TARGET.search(makefile):
         add(
@@ -194,7 +271,7 @@ def extract_entrypoints(
             )
         )
 
-    # 6. library package root: a pure library's entry is its import surface.
+    # 7. library surfaces: a pure library's entry is its import surface.
     #    Skip when a real runnable entry exists (cli/http_server); build/CI
     #    artifacts (Makefile, Dockerfile) must NOT suppress it.
     if not any(c.kind in ("cli", "http_server") for c in candidates):
@@ -208,6 +285,8 @@ def extract_entrypoints(
                 confidence=0.40,
                 invocation=f"import {pkg_name.replace('-', '_')}",
             ))
+        for lib_candidate in cargo_lib_candidates:
+            add(lib_candidate)
 
     return candidates
 

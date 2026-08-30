@@ -244,7 +244,7 @@ CLI 驱动模式由 `pipeline/analyze.py` 实现同一序列（用 LLM provider 
 | 能力 | 归属 | 理由 |
 |---|---|---|
 | metadata / tree / languages / deps / git stats / file stats | 脚本 | 确定性，API 可得 |
-| entrypoint 候选检测 | 脚本启发式 + LLM 排序解释 | 启发式可穷举（package.json bin、`__main__`、Dockerfile CMD、Makefile、包根 `__init__.py`（library_api 导入面）…），语义解释交给 LLM |
+| entrypoint 候选检测 | 脚本启发式 + LLM 排序解释 | 启发式可穷举（package.json bin、Cargo.toml `[[bin]]`/默认 `src/main.rs`、pyproject `[project].scripts`、Dockerfile CMD、Makefile 仅限 run/dev 目标、包根 `__init__.py` 与 Cargo `[lib]`/`src/lib.rs`（library_api 导入面）…），语义解释交给 LLM |
 | 代码采样与 token 预算 | 脚本 | 需要精确计算，LLM 无法做到 |
 | architecture / 模块关系 / 执行流 / 风险 / 贡献 | instructions + prompts | 纯推理 |
 | citation 校验 / schema 校验 | 脚本 | 确定性 |

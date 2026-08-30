@@ -161,14 +161,27 @@ judge scores are N=3 medians.
 | 11ty/eleventy | medium Node SSG | 9/9 (100%) | 1.00 / 1.00 / **1.00** | 12/12 | **0%** | 5/4/4/5, 5 |
 
 fd's 0.00 is the Cargo blind spot, now documented and measurable: the
-extractor has no Cargo.toml `[[bin]]` detection, so the Makefile
-`build_entry` candidate (conf 0.6) is a false positive and `src/main.rs`
-is a false negative. This is the click-2026-08-22 pattern: the case
-ships with the limitation recorded and becomes the regression guard for
-the fix (a Cargo bin heuristic should raise F1 to 1.00). eleventy is the
-positive control: the existing package.json bin heuristic hits `cmd.cjs`
-at conf 0.95, F1 = 1.00, and the three older cases are unchanged
-(regression guard held).
+extractor had no Cargo.toml `[[bin]]` detection, so the Makefile
+`build_entry` candidate (conf 0.6) was a false positive and `src/main.rs`
+a false negative. This is the click-2026-08-22 pattern: the case ships
+with the limitation recorded and becomes the regression guard for the
+fix. eleventy is the positive control: the existing package.json bin
+heuristic hits `cmd.cjs` at conf 0.95, F1 = 1.00, and the three older
+cases are unchanged (regression guard held).
+
+**Cargo bin heuristic landed (same day) — fd F1 0.00 → 1.00.** The
+extractor now parses every `Cargo.toml` in the tree (workspace member
+crates declare their own bins): `[[bin]]` targets (path resolved
+relative to the manifest's directory, conf 0.95 when the file is in the
+tree), the default `src/main.rs` bin convention (conf 0.90), and — under
+the same cli/http_server gate as the Python library root — the default
+`src/lib.rs` / explicit `[lib]` path as a `library_api` candidate. The
+Makefile rules were tightened along the way: bare presence no longer
+yields a `build_entry` (only run/dev/serve/test targets do), and
+`.PHONY` declarations name only packaging artifacts (`completions`,
+`archive`) stop matching. Full suite green (235 tests), fd F1 = 1.00
+with `src/main.rs` (conf 0.95, `cargo run --bin fd`), all four other
+cases unchanged, and the regenerated fd report judges 5/5/5/5/5 (N=3).
 
 The eleventy run also surfaced and closed an annex coverage gap: the
 digest's largest-files view capped at 8 (test files dominated eleventy's
@@ -198,8 +211,10 @@ are gone from the judge's comments, leaving only scope-legal deductions
    (`sansio/app.py` base class, two `tests/test_apps` apps). The LLM
    phase re-ranks and drops those — the eval case note says so. Gum is
    the best-case shape (single-entry CLI) at F1=1.0, eleventy (single
-   Node CLI via package.json bin) matches at F1=1.0, and fd is the
-   documented Cargo blind spot at F1=0.00 (see the 08-30 section). Click's library
+   Node CLI via package.json bin) matches at F1=1.0, and fd closed its
+   Cargo blind spot the same day the case landed: the `[[bin]]` /
+   default-bin / `[lib]` heuristic raised F1 0.00 → 1.00 (see the 08-30
+   section). Click's library
    blind spot (F1 was 0.00 — no console scripts, no `__main__`, no
    server) is closed by the library-package-root heuristic: when no
    `cli`/`http_server` candidate exists, the strongest package root
@@ -244,11 +259,12 @@ are gone from the judge's comments, leaving only scope-legal deductions
   them (flask 16/16, click 15/15, gum 18/18 on the 08-27 snapshot,
   fd 16/16 and eleventy 12/12 on the 08-30 snapshot — 0%
   hallucination each).
-- fd's entrypoint F1 is 0.00 by design (no Cargo.toml `[[bin]]`
-  detection yet); the case exists to make the blind spot measurable
-  and to guard the future heuristic. eleventy's judge grounding 4 is
-  the report's honest "implied"/"likely" inferences — the LLM flagged
-  what it could not verify, and the judge correctly deducts for it.
+- fd's entrypoint F1 was 0.00 at case launch (documented Cargo blind
+  spot) and 1.00 after the same-day `[[bin]]`/default-bin/`[lib]`
+  heuristic landed — the case remains the regression guard. eleventy's
+  judge grounding 4 is the report's honest "implied"/"likely"
+  inferences — the LLM flagged what it could not verify, and the judge
+  correctly deducts for it.
 - The annex covers the sampler's largest-file tier (15); a number the
   extractor never computes cannot be listed, so any future digest
   field needs its annex entry added with it.
