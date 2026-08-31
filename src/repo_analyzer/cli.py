@@ -248,21 +248,41 @@ def _cmd_validate_report(args: argparse.Namespace, settings: Settings) -> int:
     return 1
 
 
+def _judge_clients(settings: Settings) -> list[OpenAICompatClient]:
+    """The judge ensemble: the main LLM, plus JUDGE_* if configured.
+
+    Scoring with one model keeps the old contract; a JUDGE_API_KEY adds
+    a second provider whose scores are combined by median (evals.
+    ``_combine_judge``). Model and base url fall back to the main LLM's,
+    so a bare JUDGE_API_KEY alone still yields a second independent
+    judge client.
+    """
+    settings.require_llm()
+    judges = [OpenAICompatClient(settings)]
+    if settings.judge_api_key:
+        judges.append(
+            OpenAICompatClient(replace(
+                settings,
+                llm_base_url=settings.judge_base_url or settings.llm_base_url,
+                llm_api_key=settings.judge_api_key,
+                llm_model=settings.judge_model or settings.llm_model,
+            ))
+        )
+    return judges
+
+
 def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
     from .evals import run_all, run_case
 
     output_dir = args.output_dir or settings.output_dir
     client = GitHubClient(settings)
-    llm = None
-    if args.judge:
-        settings.require_llm()
-        llm = OpenAICompatClient(settings)
+    judges = _judge_clients(settings) if args.judge else None
 
     cases = args.cases or [str(Path(args.cases_root))]
     results = [
-        run_case(client, c, output_dir=output_dir, llm=llm)
+        run_case(client, c, output_dir=output_dir, judges=judges)
         if (Path(c) / "repo.json").is_file()
-        else run_all(client, c, output_dir=output_dir, llm=llm)
+        else run_all(client, c, output_dir=output_dir, judges=judges)
         for c in cases
     ]
     results = [r for sub in results for r in (sub if isinstance(sub, list) else [sub])]
@@ -307,6 +327,14 @@ def _cmd_eval(args: argparse.Namespace, settings: Settings) -> int:
                       f"(avg grounding {avg_g:.1f}, avg correctness {avg_c:.1f})")
                 if weak:
                     print(f"    weak:      {', '.join(weak)}")
+            models = j.get("models") or []
+            if len(models) > 1:
+                per_model = " | ".join(
+                    f"{m['model']} {m['coverage']}/{m['grounding']}/"
+                    f"{m['correctness']}/{m['actionability']},{m['usefulness']}"
+                    for m in models
+                )
+                print(f"    models:    {per_model}")
     return 0
 
 

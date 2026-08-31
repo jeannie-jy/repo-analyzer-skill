@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .context.code_sampler import sample_code
-from .errors import InputError
+from .errors import InputError, LLMError
 from .github_client import GitHubClient
 from .llm.base import LLMClient
 from .models import REPORT_FILENAME, RepoFacts, RepoRef, RepoTree
@@ -182,17 +182,102 @@ def grounding_metrics(report: dict) -> dict | None:
     }
 
 
+def _judge_model_name(llm: LLMClient) -> str:
+    """The model a judge client speaks, for per-model reporting."""
+    settings = getattr(llm, "settings", None)
+    model = getattr(settings, "llm_model", None)
+    return model or type(llm).__name__
+
+
+def _median(values: list[float]) -> float:
+    """Median of a list; even counts average the two middle values (the
+    .5 results already appear in baseline.md for N=2 A/B medians)."""
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[mid])
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _combine_judge(runs: list[tuple[str, dict]]) -> dict:
+    """Aggregate one judge run per model into the report's judge block.
+
+    The flat top-level keys stay the hard contract — they become the
+    median across models (the judge_report output of a single model is
+    the identity case). ``models`` keeps every per-model score for
+    transparency; sections are aligned by name and their grounding /
+    correctness medians are re-computed; comments are joined per model.
+    """
+    names = [name for name, _ in runs]
+    scores = [run for _, run in runs]
+    combined: dict = {
+        "coverage": _median([s["coverage"] for s in scores]),
+        "grounding": _median([s["grounding"] for s in scores]),
+        "correctness": _median([s["correctness"] for s in scores]),
+        "actionability": _median([s["actionability"] for s in scores]),
+        "usefulness": _median([s["usefulness"] for s in scores]),
+        "models": [
+            {"model": name, **{k: s[k] for k in
+                                ("coverage", "grounding", "correctness",
+                                 "actionability", "usefulness")}}
+            for name, s in runs
+        ],
+    }
+    combined["comments"] = " | ".join(
+        f"{name}: {s['comments']}" for name, s in runs if s["comments"]
+    )[:500]
+
+    # Per-section median: align by name (union, first-seen order), take
+    # the median of the scores each model gave the section.
+    by_name: dict[str, dict[str, list]] = {}
+    for _, s in runs:
+        for section in s.get("sections") or []:
+            entry = by_name.setdefault(section["name"], {"grounding": [], "correctness": [], "comments": []})
+            entry["grounding"].append(section["grounding"])
+            entry["correctness"].append(section["correctness"])
+            if section.get("comments"):
+                entry["comments"].append(section["comments"])
+    combined["sections"] = [
+        {
+            "name": name,
+            "grounding": _median(entry["grounding"]),
+            "correctness": _median(entry["correctness"]),
+            "comments": " | ".join(entry["comments"])[:300],
+        }
+        for name, entry in by_name.items()
+    ]
+    return combined
+
+
+MAX_JUDGE_RETRIES = 2
+
+
 def judge_report(llm: LLMClient, report_md: str, case_name: str, url: str) -> dict:
-    """Score an existing report.md with the rubric (LLM-as-judge)."""
+    """Score an existing report.md with the rubric (LLM-as-judge).
+
+    Parsing failures retry (same ask, up to ``MAX_JUDGE_RETRIES``):
+    reasoning models occasionally truncate their output when the chain of
+    thought eats the token budget, and a single judge must not abort the
+    whole eval run.
+    """
     user = (
         f"Repository: {case_name} ({url})\n\n"
         f"Report:\n{report_md}\n\n"
         "Score each criterion and return the JSON object."
     )
-    parsed = _parse_json_response(
-        llm.complete([{"role": "system", "content": _JUDGE_SYSTEM},
-                      {"role": "user", "content": user}])
-    )
+    last_error: LLMError | None = None
+    for _ in range(MAX_JUDGE_RETRIES + 1):
+        try:
+            parsed = _parse_json_response(
+                llm.complete([{"role": "system", "content": _JUDGE_SYSTEM},
+                              {"role": "user", "content": user}])
+            )
+            break
+        except LLMError as exc:
+            last_error = exc
+    else:
+        assert last_error is not None
+        raise last_error
     scored = {}
     for key in ("coverage", "grounding", "correctness", "actionability", "usefulness"):
         value = parsed.get(key)
@@ -242,7 +327,7 @@ def run_case(
     case_dir: str | Path,
     *,
     output_dir: str | Path,
-    llm: LLMClient | None = None,
+    judges: list[LLMClient] | None = None,
     fetch_raw_fn: Callable | None = None,
 ) -> CaseResult:
     """Extract facts for a pinned ref and score every deterministic metric."""
@@ -261,11 +346,15 @@ def run_case(
         )
 
     judge = None
-    if llm is not None:
+    if judges:
         md_path = ref.workdir(output_dir) / "report.md"
         if md_path.is_file():
-            judge = judge_report(llm, md_path.read_text(encoding="utf-8"),
-                                 ref.api_path, case["repo"]["url"])
+            report_md = md_path.read_text(encoding="utf-8")
+            judge = _combine_judge([
+                (_judge_model_name(j), judge_report(j, report_md, ref.api_path,
+                                                    case["repo"]["url"]))
+                for j in judges
+            ])
 
     return CaseResult(
         case=case["directory"].name,
@@ -284,7 +373,7 @@ def run_all(
     cases_root: str | Path,
     *,
     output_dir: str | Path,
-    llm: LLMClient | None = None,
+    judges: list[LLMClient] | None = None,
     fetch_raw_fn: Callable | None = None,
 ) -> list[CaseResult]:
     """Run every ``evals/cases/*`` subdirectory and return per-case results."""
@@ -294,7 +383,7 @@ def run_all(
         if not (case_dir / REPO_FILENAME).is_file():
             continue  # not a case directory
         results.append(
-            run_case(client, case_dir, output_dir=output_dir, llm=llm,
+            run_case(client, case_dir, output_dir=output_dir, judges=judges,
                      fetch_raw_fn=fetch_raw_fn)
         )
     return results

@@ -8,12 +8,16 @@ import json
 import pytest
 
 from repo_analyzer.evals import (
+    _combine_judge,
+    _judge_model_name,
+    _median,
     entrypoint_metrics,
     grounding_metrics,
     judge_report,
     load_case,
     structure_accuracy,
 )
+from repo_analyzer.config import Settings
 from repo_analyzer.errors import InputError
 from repo_analyzer.models import (
     EntrypointCandidate,
@@ -227,6 +231,131 @@ def test_judge_report_parses_sections() -> None:
     ]
     # flat five still parse alongside the per-section array
     assert scores["coverage"] == 4 and scores["usefulness"] == 4
+
+
+def _judge_run(model: str, scores: dict) -> tuple[str, dict]:
+    """A per-model judge run with the flat keys judge_report produces."""
+    return model, {
+        "coverage": scores.get("coverage", 4),
+        "grounding": scores.get("grounding", 4),
+        "correctness": scores.get("correctness", 4),
+        "actionability": scores.get("actionability", 4),
+        "usefulness": scores.get("usefulness", 4),
+        "comments": scores.get("comments", ""),
+        "sections": scores.get("sections", []),
+    }
+
+
+# --- judge ensemble ---------------------------------------------------------
+
+
+def test_median_odd_and_even() -> None:
+    assert _median([5, 3, 4]) == 4
+    assert _median([4, 5]) == 4.5  # even count: mid-two mean (baseline.md style)
+    assert _median([2, 5, 5]) == 5
+    assert _median([1, 2, 3, 4]) == 2.5
+
+
+def test_combine_judge_single_model_is_identity() -> None:
+    run = _judge_run("deepseek-v4-flash", {
+        "coverage": 4, "grounding": 5, "comments": "ok",
+        "sections": [{"name": "Overview", "grounding": 5, "correctness": 4,
+                      "comments": "good"}],
+    })
+    combined = _combine_judge([run])
+    assert combined["coverage"] == 4
+    assert combined["grounding"] == 5
+    assert combined["comments"] == "deepseek-v4-flash: ok"
+    assert combined["sections"] == [
+        {"name": "Overview", "grounding": 5, "correctness": 4,
+         "comments": "good"}]
+    assert combined["models"] == [
+        {"model": "deepseek-v4-flash", "coverage": 4, "grounding": 5,
+         "correctness": 4, "actionability": 4, "usefulness": 4}]
+
+
+def test_combine_judge_two_models_takes_median_and_keeps_both() -> None:
+    a = _judge_run("deepseek-v4-flash", {
+        "coverage": 4, "grounding": 5, "correctness": 4, "actionability": 4,
+        "usefulness": 5, "comments": "model A",
+        "sections": [
+            {"name": "Overview", "grounding": 5, "correctness": 4, "comments": "A1"},
+            {"name": "Risks", "grounding": 3, "correctness": 5, "comments": "A2"},
+        ],
+    })
+    b = _judge_run("gpt-4o-mini", {
+        "coverage": 5, "grounding": 4, "correctness": 4, "actionability": 5,
+        "usefulness": 4, "comments": "model B",
+        "sections": [
+            {"name": "Overview", "grounding": 4, "correctness": 5, "comments": "B1"},
+            {"name": "Risks", "grounding": 5, "correctness": 3, "comments": "B2"},
+        ],
+    })
+    combined = _combine_judge([a, b])
+    assert combined["coverage"] == 4.5
+    assert combined["grounding"] == 4.5
+    assert combined["correctness"] == 4
+    assert combined["actionability"] == 4.5
+    assert combined["usefulness"] == 4.5
+    assert combined["comments"] == "deepseek-v4-flash: model A | gpt-4o-mini: model B"
+    assert combined["sections"] == [
+        {"name": "Overview", "grounding": 4.5, "correctness": 4.5,
+         "comments": "A1 | B1"},
+        {"name": "Risks", "grounding": 4, "correctness": 4,
+         "comments": "A2 | B2"},
+    ]
+    assert [m["model"] for m in combined["models"]] == [
+        "deepseek-v4-flash", "gpt-4o-mini"]
+    assert combined["models"][0]["coverage"] == 4  # per-model scores kept
+
+
+def test_combine_judge_three_models_takes_true_median() -> None:
+    runs = [
+        _judge_run(m, {"coverage": v, "grounding": v,
+                       "correctness": v, "actionability": v, "usefulness": v})
+        for m, v in [("a", 3), ("b", 5), ("c", 4)]
+    ]
+    combined = _combine_judge(runs)
+    assert combined["coverage"] == 4  # median of 3, 5, 4
+    assert combined["grounding"] == 4
+
+
+def test_combine_judge_aligns_sections_by_name_and_skips_empty_comments() -> None:
+    a = _judge_run("a", {"sections": [
+        {"name": "Overview", "grounding": 5, "correctness": 5, "comments": "A"}]})
+    b = _judge_run("b", {"sections": [
+        {"name": "Overview", "grounding": 3, "correctness": 3, "comments": ""},
+        {"name": "Unknowns", "grounding": 2, "correctness": 4, "comments": "B"}]})
+    combined = _combine_judge([a, b])
+    assert [s["name"] for s in combined["sections"]] == ["Overview", "Unknowns"]
+    overview = combined["sections"][0]
+    assert overview["grounding"] == 4  # median of 5, 3
+    assert overview["comments"] == "A"  # empty comment dropped
+    unknowns = combined["sections"][1]
+    assert unknowns["grounding"] == 2  # only b scored it
+    assert unknowns["comments"] == "B"
+
+
+def test_judge_report_retries_parse_failures() -> None:
+    """A truncated reasoning-model reply must not abort the eval run."""
+    from repo_analyzer.errors import LLMError
+
+    good = json.dumps({"coverage": 4, "grounding": 5, "correctness": 4,
+                       "actionability": 4, "usefulness": 4})
+    llm = FakeLLM([LLMError("invalid JSON: truncated"), good])
+    scores = judge_report(llm, "report", "x/y", "https://github.com/x/y")
+    assert scores["coverage"] == 4
+    assert len(llm.calls) == 2  # first reply failed, second succeeded
+
+    llm = FakeLLM([LLMError("nope"), LLMError("nope"), LLMError("nope")])
+    with pytest.raises(LLMError):
+        judge_report(llm, "report", "x/y", "https://github.com/x/y")
+
+
+def test_judge_model_name_reads_settings() -> None:
+    llm = FakeLLM([], settings=Settings(llm_model="fancy-model"))
+    assert _judge_model_name(llm) == "fancy-model"
+    assert _judge_model_name(object()) == "object"  # fallback: class name
 
 
 def test_judge_report_sections_lenient() -> None:

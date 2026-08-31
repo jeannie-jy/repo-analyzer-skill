@@ -53,6 +53,21 @@ def test_reasoning_model_tuning_keys() -> None:
     assert settings.llm_reasoning_effort == "low"
 
 
+def test_judge_ensemble_keys_parse_and_default_none() -> None:
+    settings = Settings.from_env(
+        {"JUDGE_BASE_URL": "https://api.openai.com/v1",
+         "JUDGE_API_KEY": "sk-judge", "JUDGE_MODEL": "gpt-4o-mini"}
+    )
+    assert settings.judge_base_url == "https://api.openai.com/v1"
+    assert settings.judge_api_key == "sk-judge"
+    assert settings.judge_model == "gpt-4o-mini"
+
+    unset = Settings.from_env({})
+    assert unset.judge_base_url is None
+    assert unset.judge_api_key is None
+    assert unset.judge_model is None
+
+
 def test_openai_api_key_alias_is_accepted() -> None:
     settings = Settings.from_env({"OPENAI_API_KEY": "sk-alias", "OPENAI_BASE_URL": "https://x/v1"})
     assert settings.llm_api_key == "sk-alias"

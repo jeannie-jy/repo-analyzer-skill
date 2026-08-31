@@ -19,7 +19,12 @@ judge metrics cost one LLM call per analyzed report.
   2026-08-30 the rubric also scores every content section of the
   report (grounding + correctness each) and returns them as a
   `sections` array ahead of the overall scores; parsing is lenient, so
-  older judge output without `sections` still parses (Roadmap item 6).
+  older judge output without `sections` still parses. An optional
+  second provider (`JUDGE_API_KEY` + `JUDGE_MODEL`) turns the judge
+  into an ensemble: the flat score line is the median across models
+  (`.5` values appear for even counts), per-model scores stay in
+  `models`, and section scores are re-medianed per section name
+  (Roadmap item 6).
 - **Reproduce**: `repo-analyzer eval --output-dir output --judge`
   (full results in `baseline.json`).
 

@@ -60,7 +60,16 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", 0))
-        self.__class__.posts.append(json.loads(self.rfile.read(length) or b"{}"))
+        body = json.loads(self.rfile.read(length) or b"{}")
+        self.__class__.posts.append(body)
+        # per-model judge responses: /v1/models/<model> routes let the
+        # ensemble test feed each judge model its own score
+        if (self.path == "/v1/chat/completions"
+                and isinstance(body, dict) and body.get("model")):
+            model_route = f"/v1/models/{body['model']}"
+            if model_route in self.routes:
+                self._respond(self.routes[model_route])
+                return
         self._respond(self.routes.get(self.path, NOT_FOUND))
 
     def _respond(self, entry: tuple[int, dict, bytes]) -> None:
@@ -129,7 +138,9 @@ def _noop_raw(_ref, _branch, _path) -> str:
 
 
 def _patch_settings(
-    monkeypatch, server_url: str, tmp_path: Path, *, api_key: str = "sk-test", report_language: str = "en"
+    monkeypatch, server_url: str, tmp_path: Path, *, api_key: str = "sk-test",
+    report_language: str = "en", judge_api_key: str | None = None,
+    judge_base_url: str | None = None, judge_model: str | None = None,
 ) -> Settings:
     settings = Settings(
         github_api_url=server_url,
@@ -139,6 +150,9 @@ def _patch_settings(
         output_dir=str(tmp_path),
         token_budget=40_000,
         report_language=report_language,
+        judge_api_key=judge_api_key,
+        judge_base_url=judge_base_url,
+        judge_model=judge_model,
     )
     monkeypatch.setattr(Settings, "from_env", lambda: settings)
     monkeypatch.setattr("repo_analyzer.extract.file_stats._fetch_raw", _noop_raw)
@@ -204,6 +218,44 @@ def test_analyze_passes_report_language(tmp_path, server, monkeypatch, capsys) -
     md = (workdir / REPORT_MD_FILENAME).read_text(encoding="utf-8")
     assert "# 仓库分析报告: pallets/flask" in md
     assert "## 概述" in md
+
+
+def test_eval_judge_ensemble_two_models(tmp_path, server, monkeypatch, capsys) -> None:
+    # a real report.md must exist before the judge can score it
+    _patch_settings(monkeypatch, server, tmp_path,
+                    judge_api_key="sk-judge", judge_model="fake-judge")
+    assert main(["analyze", str(REF.url)]) == 0
+    _Handler.posts = []  # isolate the eval phase's judge calls
+
+    case_dir = tmp_path / "cases" / "flask"
+    case_dir.mkdir(parents=True)
+    (case_dir / "repo.json").write_text(
+        json.dumps({"url": str(REF.url)}), encoding="utf-8")
+    (case_dir / "gold.json").write_text(
+        json.dumps({"entrypoints": [{"path": "flask/__init__.py"}]}),
+        encoding="utf-8")
+
+    # each judge model gets its own scores; JUDGE_BASE_URL is unset, so
+    # the second judge falls back to the main LLM's endpoint
+    def _judge(coverage: int, grounding: int) -> dict:
+        return {"choices": [{"message": {"content": json.dumps({
+            "coverage": coverage, "grounding": grounding, "correctness": 4,
+            "actionability": 4, "usefulness": 4, "comments": "m"})}}]}
+
+    headers = {"Content-Type": "application/json"}
+    for model, coverage, grounding in [("fake-model", 4, 5), ("fake-judge", 5, 3)]:
+        _Handler.routes[f"/v1/models/{model}"] = (
+            200, headers, json.dumps(_judge(coverage, grounding)).encode())
+
+    code = main(["eval", "--judge", str(case_dir), "-o", str(tmp_path)])
+    assert code == 0
+    out = capsys.readouterr().out
+    # flat judge line is the median across models
+    assert "coverage 4.5 grounding 4" in out
+    # per-model line lists both judges with their own scores
+    assert "fake-model 4/5/4/4,4 | fake-judge 5/3/4/4,4" in out
+    # exactly one judge call per model (the analyze phase is already done)
+    assert [p["model"] for p in _Handler.posts] == ["fake-model", "fake-judge"]
 
 
 def test_sample_code_command_lists_files(tmp_path, server, monkeypatch, capsys) -> None:

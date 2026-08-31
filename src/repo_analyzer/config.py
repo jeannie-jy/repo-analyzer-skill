@@ -52,6 +52,15 @@ class Settings:
     llm_max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS
     llm_reasoning_effort: str | None = None
 
+    # Optional second LLM provider for the judge ensemble (eval --judge):
+    # when judge_api_key is set, reports are scored by both the main model
+    # and this one, and the median is reported. Each field falls back to
+    # its main-LLM counterpart when unset (model/base url only — the key
+    # is what enables the second judge).
+    judge_base_url: str | None = None
+    judge_api_key: str | None = None
+    judge_model: str | None = None
+
     report_language: str = DEFAULT_REPORT_LANGUAGE
     output_dir: str = DEFAULT_OUTPUT_DIR
     token_budget: int = DEFAULT_TOKEN_BUDGET
@@ -94,6 +103,9 @@ class Settings:
             llm_model=get("LLM_MODEL") or DEFAULT_LLM_MODEL,
             llm_max_output_tokens=get_int("LLM_MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS),
             llm_reasoning_effort=get("LLM_REASONING_EFFORT"),
+            judge_base_url=get("JUDGE_BASE_URL"),
+            judge_api_key=get("JUDGE_API_KEY"),
+            judge_model=get("JUDGE_MODEL"),
             report_language=(get("REPORT_LANGUAGE") or DEFAULT_REPORT_LANGUAGE).lower(),
             output_dir=get("OUTPUT_DIR") or DEFAULT_OUTPUT_DIR,
             token_budget=get_int("TOKEN_BUDGET", DEFAULT_TOKEN_BUDGET),
